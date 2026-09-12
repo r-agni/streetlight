@@ -6,10 +6,10 @@
  */
 import { Pause, Play } from 'lucide-react';
 
-import { connection } from '../sim/connection';
+import { API_URL, connection } from '../sim/connection';
 import { clockParts, useSim } from '../state/simStore';
 
-const SPEEDS = [1, 5, 20, 60, 180];
+const SPEEDS = [1, 4, 8, 30, 120];
 
 function Chip({
   active,
@@ -40,10 +40,11 @@ function Chip({
 }
 
 export function Controls() {
-  const { minute, playing, speed, showDensity, showAgents, fps, frameAge, ticksPerSecond } =
-    useSim();
+  const {
+    minute, clock, playing, speed, showDensity, showAgents, fps, frameAge, ticksPerSecond,
+  } = useSim();
   const set = useSim((s) => s.set);
-  const clock = clockParts(minute);
+  const parts = clockParts(minute);
 
   const toggledPlay = () => {
     const next = !playing;
@@ -52,7 +53,7 @@ export function Controls() {
   };
 
   const seek = (minuteOfDay: number) => {
-    const target = clock.day * 1440 + minuteOfDay;
+    const target = parts.day * 1440 + minuteOfDay;
     set({ minute: target });
     connection.control('seek', target);
   };
@@ -69,10 +70,31 @@ export function Controls() {
           {playing ? <Pause size={14} strokeWidth={2.4} /> : <Play size={14} strokeWidth={2.4} />}
         </button>
 
-        <div className="tnum font-display text-[20px] leading-none tracking-tight">
-          {clock.label}
+        <div className="min-w-0">
+          <div className="tnum font-display text-[20px] leading-none tracking-tight">
+            {parts.label}
+          </div>
+          <div className="truncate text-[10px] text-[var(--color-ink-soft)]">
+            {clock?.label ?? parts.dayName}
+          </div>
         </div>
-        <div className="eyebrow text-[var(--color-ink-soft)]">{clock.dayName}</div>
+
+        {clock && clock.horizon !== 'live' && (
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const res = await fetch(`${API_URL}/api/clock`, { method: 'POST' });
+                if (res.ok) useSim.getState().setClock(await res.json());
+              } catch {
+                /* the service will resend the clock on its next stats message */
+              }
+            }}
+            className="shrink-0 rounded-[7px] bg-[var(--color-ink-blue)] px-2 py-1 text-[10.5px] font-medium text-white"
+          >
+            Back to now
+          </button>
+        )}
 
         <div className="ml-auto flex items-center gap-1.5">
           {SPEEDS.map((s) => (
@@ -97,7 +119,7 @@ export function Controls() {
           type="range"
           min={0}
           max={1439}
-          value={clock.minuteOfDay}
+          value={parts.minuteOfDay}
           onChange={(e) => seek(Number(e.target.value))}
           className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[var(--color-hairline)] accent-[var(--color-ink-blue)]"
           aria-label="Time of day"

@@ -11,6 +11,7 @@ import { ArrowRight, CornerDownLeft, Loader2, Sparkles } from 'lucide-react';
 import { connection } from '../sim/connection';
 import { SUGGESTIONS, useApp } from '../state/appStore';
 import { ToolTrail } from './ToolTrail';
+import { Markdown } from './Markdown';
 
 export function Assistant() {
   const [draft, setDraft] = useState('');
@@ -89,11 +90,11 @@ export function Assistant() {
           ) : (
             <div key={i} className="space-y-1.5">
               {!!m.steps?.length && <ToolTrail steps={m.steps} />}
-              <div className="whitespace-pre-wrap text-[12.5px] leading-relaxed">
-                {m.text || (
-                  <span className="text-[var(--color-ink-soft)]">thinking…</span>
-                )}
-              </div>
+              {m.text ? (
+                <Markdown text={m.text} />
+              ) : (
+                <span className="text-[12.5px] text-[var(--color-ink-soft)]">thinking…</span>
+              )}
             </div>
           ),
         )}

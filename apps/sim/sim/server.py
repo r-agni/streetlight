@@ -58,7 +58,10 @@ class Hub:
         self.cfg: dict = {}
         self.clients: set[asyncio.Queue] = set()
         self.playing = True
-        self.speed = 20.0  # simulated minutes per real second
+        # Twenty crosses a whole day in seventy seconds, which drops the
+        # view into the small hours before anyone has finished reading the
+        # first panel. Eight is still lively and stays in daylight far longer.
+        self.speed = 8.0  # simulated minutes per real second
         self.frame_hz = 6.0
         self.run_id = "run-0"
         self._task: asyncio.Task | None = None
@@ -67,6 +70,8 @@ class Hub:
         self.tools: dict = {}
         #: the real moment the clock is currently standing in for
         self.anchor = calendar.live()
+        #: the tick count when that anchor was set, so elapsed time is monotonic
+        self.anchor_tick = 0
 
     def load(self) -> None:
         self.cfg = yaml.safe_load((ROOT / "config.yaml").read_text())
@@ -78,6 +83,7 @@ class Hub:
         # arbitrary weekday the session happened to begin on.
         self.anchor = calendar.live()
         self.sim.seek(self.anchor.minute)
+        self.anchor_tick = self.sim.tick_count
         self.tools = build_tools(ROOT, self.world, self.sim, self)
         self.assistant = _make_assistant(self.tools)
         print(f"assistant: {type(self.assistant).__name__} "
@@ -176,30 +182,40 @@ class Hub:
         """
         from datetime import timedelta
 
-        minute = self.sim.minute_of_week
-        anchor = self.anchor
-        # keep the anchor's date, take the day and time from the live clock
-        day_shift = (minute // MINUTES_PER_DAY) - (anchor.minute // MINUTES_PER_DAY)
-        moment = (anchor.moment + timedelta(days=day_shift)).replace(
-            hour=(minute % MINUTES_PER_DAY) // 60,
-            minute=minute % 60,
-            second=0,
-            microsecond=0,
+        # Count elapsed ticks rather than compare minute-of-week positions.
+        # Comparing positions walks the date a week backwards the moment the
+        # simulation crosses Sunday midnight; ticks are monotonic, so the date
+        # only ever moves forward.
+        elapsed = max(0, self.sim.tick_count - self.anchor_tick)
+        moment = (self.anchor.moment + timedelta(minutes=elapsed)).replace(
+            second=0, microsecond=0
         )
         instant = calendar.at(moment)
-        # The playhead runs faster than wall time, so simply classifying the
-        # current minute would relabel the view "projecting" within seconds of
-        # pressing play. Playing forward from now is not time travel: the
-        # horizon stays whatever the viewer actually asked for.
+
+        # The playhead runs faster than wall time, so classifying the current
+        # moment alone would relabel the view "projecting" seconds after
+        # pressing play. Playing forward from now is simulating ahead, not time
+        # travel, and is described as such.
+        horizon = self.anchor.horizon
         instant = calendar.Instant(
-            moment=instant.moment, minute=instant.minute, horizon=anchor.horizon
+            moment=instant.moment, minute=instant.minute, horizon=horizon
         )
-        return {**instant.to_dict(), "describe": calendar.describe(instant)}
+        state = {**instant.to_dict(), "describe": calendar.describe(instant)}
+        state["elapsedMinutes"] = int(elapsed)
+        if horizon == "live" and elapsed > 90:
+            hours = elapsed / 60.0
+            state["describe"] = (
+                f"Simulating forward from now: {instant.label}, "
+                f"{hours:.1f} hours past the real clock. Press the live button to "
+                "return to the present."
+            )
+        return state
 
     def set_anchor(self, instant) -> None:
         """Move to a real date and time, past or future."""
         self.anchor = instant
         self.sim.seek(instant.minute)
+        self.anchor_tick = self.sim.tick_count
 
     def hello(self) -> dict:
         sim, world = self.sim, self.world

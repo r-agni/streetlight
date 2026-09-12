@@ -106,7 +106,14 @@ export function BusinessPanel() {
       {!sitesLoading && !sites.length && (
         <p className="mt-3 text-[11.5px] leading-relaxed text-[var(--color-ink-soft)]">
           Candidates are parcels registered under the commercial vacancy tax.
-          Pick a category and a neighbourhood to rank them.
+          Pick a category and a neighbourhood, or ask the assistant, and the
+          ranked addresses appear here.
+        </p>
+      )}
+
+      {!sitesLoading && !!sites.length && sites[0]?.area && (
+        <p className="mt-2 text-[10.5px] leading-snug text-[var(--color-ink-soft)]">
+          Showing the addresses from the assistant&rsquo;s last answer.
         </p>
       )}
 

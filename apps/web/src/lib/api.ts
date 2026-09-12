@@ -88,6 +88,8 @@ export interface RankedSite {
   complementaryPlaces: number;
   catchmentMethod: string;
   reading: string;
+  /** set when the site came from an opportunity search rather than a panel query */
+  area?: string;
 }
 
 export interface EventReport {

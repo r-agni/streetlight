@@ -36,20 +36,28 @@ export function PosterCard() {
         network. Foot traffic here is emergent, not drawn.
       </p>
 
-      <div className="mt-6 grid grid-cols-2 gap-y-4">
-        <Stat
-          label={
-            clock?.horizon === 'past'
-              ? 'Looking back at'
-              : clock?.horizon === 'future'
-                ? 'Projecting'
-                : 'Now in San Francisco'
-          }
-          value={clock?.label ?? `${parts.dayName.slice(0, 3)} ${parts.label}`}
-        />
+      {/* the full date needs its own row; squeezed into a stat column it wrapped */}
+      <div className="clock-row mt-5">
+        <div className="tnum text-[15px] leading-tight text-white">
+          {clock?.label ?? `${parts.dayName} ${parts.label}`}
+        </div>
+        <div className="eyebrow muted mt-0.5">
+          {clock?.horizon === 'past'
+            ? 'Looking back'
+            : clock?.horizon === 'future'
+              ? 'Projected'
+              : 'Now in San Francisco'}
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-y-4">
         <Stat label="People modelled" value={people.toLocaleString()} />
         <Stat label="On the move" value={moving.toLocaleString()} />
         <Stat label="At a place" value={dwelling.toLocaleString()} />
+        <Stat
+          label="Simulated"
+          value={`${Math.round((moving + dwelling) / 1000)}k active`}
+        />
       </div>
 
       <div className="faint mt-6 flex items-center justify-between border-t border-white/15 pt-3 text-[10px] uppercase tracking-[0.09em]">
