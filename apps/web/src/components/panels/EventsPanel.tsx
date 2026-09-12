@@ -67,7 +67,7 @@ export function EventsPanel() {
   const peakArrival = Math.max(...arrivals.map((a) => a.people), 1);
 
   return (
-    <div className="card-paper flex max-h-[58vh] flex-col px-4 py-3">
+    <div className="card-paper flex flex-col px-4 py-3">
       <div className="eyebrow mb-2 text-[var(--color-ink-soft)]">Plan an event</div>
 
       <div className="space-y-1.5">
@@ -169,7 +169,7 @@ export function EventsPanel() {
       )}
 
       {eventReport && (
-        <div className="mt-3 flex-1 space-y-3 overflow-y-auto">
+        <div className="mt-3 max-h-[44vh] space-y-3 overflow-y-auto">
           <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
             <span className="text-[var(--color-ink-soft)]">From within the city</span>
             <span className="tnum text-right">

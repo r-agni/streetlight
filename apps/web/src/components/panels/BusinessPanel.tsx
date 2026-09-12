@@ -64,7 +64,7 @@ export function BusinessPanel() {
   };
 
   return (
-    <div className="card-paper flex max-h-[58vh] flex-col px-4 py-3">
+    <div className="card-paper flex flex-col px-4 py-3">
       <div className="eyebrow mb-2 text-[var(--color-ink-soft)]">Find a site</div>
 
       <div className="flex gap-1.5">
@@ -110,7 +110,7 @@ export function BusinessPanel() {
         </p>
       )}
 
-      <div className="mt-2 flex-1 space-y-1.5 overflow-y-auto">
+      <div className="mt-2 max-h-[46vh] space-y-1.5 overflow-y-auto">
         {sites.map((site) => {
           const open = selectedSite === site.rank;
           return (

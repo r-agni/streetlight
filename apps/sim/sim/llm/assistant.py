@@ -59,8 +59,10 @@ TOOLS
 
 - get_area_report: what one place is like, in one call.
 - find_opportunity: for a specific business concept, where demand outruns the
-  supply that already trades there. Use this whenever someone names a concept
-  rather than a generic category.
+  supply that already trades there, ending in specific vacant addresses. Use it
+  whenever someone names a concept rather than a generic category. Its
+  vacantSites field holds real registered vacancies: name those addresses in
+  your answer rather than stopping at a neighbourhood.
 - research_demand: live evidence for one place, with quotable citations -
   current listings, customer review text, vacancies nearby, and who lives
   there. Call it after find_opportunity to back the recommendation up, and
@@ -122,8 +124,9 @@ def tool_definitions() -> list[dict]:
                 "For a specific business concept, find where demand outruns the "
                 "supply already trading. Searches real listings for what exists, "
                 "reads their ratings and review counts as a demand signal, "
-                "measures modelled footfall and residents nearby, and ranks "
-                "neighbourhoods by the gap. Use whenever someone names a concept "
+                "measures modelled footfall and residents nearby, ranks "
+                "neighbourhoods by the gap, and then returns specific vacant "
+                "addresses inside the best of them. Use whenever someone names a concept "
                 "rather than a category, such as 'Indian chai house', 'natural "
                 "wine bar' or 'Ethiopian restaurant'."
             ),

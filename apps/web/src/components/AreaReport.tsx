@@ -235,7 +235,7 @@ export function AreaPanel() {
   }
 
   return (
-    <div className="card-paper max-h-[52vh] overflow-y-auto px-4 py-3">
+    <div className="card-paper px-4 py-3">
       <div className="mb-2 flex items-baseline justify-between">
         <div className="text-[12px] font-semibold">This block</div>
         {reportPoint && (

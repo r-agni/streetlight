@@ -23,7 +23,7 @@ export function PosterCard() {
   const people = Math.round((nAgents || 0) * (830_000 / Math.max(nAgents, 1)));
 
   return (
-    <div className="card-blue w-[390px] px-7 py-6 shadow-[0_10px_40px_rgba(11,11,18,0.18)]">
+    <div className="card-blue w-full px-6 py-5 shadow-[0_10px_40px_rgba(11,11,18,0.18)]">
       <div className="font-display text-[26px] leading-[1.06] tracking-tight text-white">
         SAN FRANCISCO
       </div>

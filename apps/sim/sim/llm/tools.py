@@ -205,7 +205,36 @@ def build_tools(root: Path, world, sim, hub) -> dict:
             root, world, sim, concept, list(search_terms), resolved, category
         )
         top = result["areas"][:6]
+
+        # A neighbourhood is not a place you can lease. Score the registered
+        # vacancies inside the best areas so the recommendation ends at an
+        # address the operator can actually go and look at.
+        lease_category = category or "cafe"
+        best_areas = [row["area"] for row in result["areas"][:3]]
+        vacancies = []
+        for area_name in best_areas:
+            frame = _candidate_frame(root, world, area_name)
+            if frame.empty:
+                continue
+            ranked = insight.rank_sites(root, world, sim, lease_category, frame, limit=3)
+            for site in ranked:
+                if "location" not in site:
+                    continue
+                site["area"] = area_name
+                vacancies.append(site)
+        vacancies.sort(key=lambda s: -s["score"])
+        vacancies = vacancies[:6]
+        result["vacantSites"] = vacancies
+        result["vacantSiteNote"] = (
+            "Registered under the commercial vacancy tax and scored against each "
+            "other for a " + lease_category.replace("_", " ") + ". A filing means "
+            "the space was reported vacant, not that it is listed or available today."
+        )
+
         markers = [
+            {"label": str(i + 1), "lon": site["location"][0], "lat": site["location"][1]}
+            for i, site in enumerate(vacancies)
+        ] or [
             {"label": str(row["rank"]), "lon": row["lon"], "lat": row["lat"]}
             for row in top
         ]
@@ -213,10 +242,19 @@ def build_tools(root: Path, world, sim, hub) -> dict:
             {"action": "setMode", "payload": {"mode": "business"}},
             {"action": "highlight", "payload": {"markers": markers, "kind": "site"}},
         ]
+        if vacancies:
+            # the panel shows the same addresses the answer names
+            actions.append({"action": "setSites", "payload": {"sites": vacancies}})
+            actions.append(
+                {"action": "setPanelQuery",
+                 "payload": {"siteCategory": lease_category,
+                             "siteNear": best_areas[0] if best_areas else ""}}
+            )
         if markers:
             actions.append(
                 {"action": "flyTo",
-                 "payload": {"lon": markers[0]["lon"], "lat": markers[0]["lat"], "zoom": 13.6}}
+                 "payload": {"lon": markers[0]["lon"], "lat": markers[0]["lat"],
+                             "zoom": 15.0 if vacancies else 13.6}}
             )
 
         sources = [
@@ -246,10 +284,21 @@ def build_tools(root: Path, world, sim, hub) -> dict:
                     detail="No Google key configured; supply counted from the catalog only",
                 ),
             )
-        return ToolResult(
-            result, actions, sources,
-            f"Weighed {len(resolved)} areas for {concept} against what already trades there.",
+        if vacancies:
+            sources.append(
+                open_data_source(
+                    "Commercial vacancy filings",
+                    len(vacancies),
+                    "scored inside the best areas",
+                )
+            )
+        summary = (
+            f"Weighed {len(resolved)} areas for {concept}, then scored "
+            f"{len(vacancies)} registered vacancies inside the best of them."
+            if vacancies
+            else f"Weighed {len(resolved)} areas for {concept} against what already trades there."
         )
+        return ToolResult(result, actions, sources, summary)
 
     def research_demand(topic: str, place: str,
                         search_terms: list[str] | None = None) -> ToolResult:

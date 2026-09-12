@@ -36,7 +36,7 @@ export function Assistant() {
   };
 
   return (
-    <div className="card-paper flex h-full w-[360px] flex-col overflow-hidden">
+    <div className="card-paper flex h-full w-[350px] flex-col overflow-hidden">
       <div className="flex items-center gap-2 border-b border-[var(--color-hairline)] px-4 py-3">
         <Sparkles size={14} className="text-[var(--color-ink-blue)]" strokeWidth={2.2} />
         <div className="text-[12.5px] font-semibold">Ask about the city</div>
