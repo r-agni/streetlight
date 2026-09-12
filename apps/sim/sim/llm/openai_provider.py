@@ -132,20 +132,34 @@ class OpenAIAssistant:
 
             for call in calls.values():
                 name = call["name"]
-                await emit({"type": "assistantTool", "name": name, "status": "start"})
+                try:
+                    parsed = json.loads(call["arguments"] or "{}")
+                except json.JSONDecodeError:
+                    parsed = {}
+                await emit(
+                    {"type": "assistantTool", "name": name, "status": "start", "input": parsed}
+                )
                 fn = self.tools.get(name)
                 if fn is None:
                     payload = json.dumps({"error": f"no tool named {name}"})
                     await emit({"type": "assistantTool", "name": name, "status": "error"})
                 else:
                     try:
-                        # arguments are a JSON string here, never a parsed object
-                        arguments = json.loads(call["arguments"] or "{}")
-                        result = fn(**arguments)
+                        # arguments arrive as a JSON string here, never parsed
+                        result = fn(**parsed)
                         for action in result.map_actions:
                             await emit({"type": "mapAction", **action})
                         payload = json.dumps(result.payload, default=str)[:24_000]
-                        await emit({"type": "assistantTool", "name": name, "status": "ok"})
+                        await emit(
+                            {
+                                "type": "assistantTool",
+                                "name": name,
+                                "status": "ok",
+                                "input": parsed,
+                                "summary": result.summary,
+                                "sources": [src.to_dict() for src in result.sources],
+                            }
+                        )
                     except Exception as exc:
                         payload = json.dumps({"error": f"{type(exc).__name__}: {exc}"})
                         await emit(

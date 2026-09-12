@@ -11,10 +11,27 @@ import type { AreaReport, EventReport, LayerInfo, LayerPoints, RankedSite } from
 
 export type Mode = 'explore' | 'business' | 'planner' | 'events';
 
+export interface ToolSource {
+  label: string;
+  kind: 'recorded' | 'modelled' | 'derived' | 'reference';
+  detail?: string;
+  count?: number;
+  window?: string;
+}
+
+/** One tool call, with what it was asked and what it actually read. */
+export interface ToolStep {
+  name: string;
+  status: 'start' | 'ok' | 'error';
+  input?: Record<string, unknown>;
+  summary?: string;
+  sources?: ToolSource[];
+}
+
 export interface AssistantMessage {
   role: 'user' | 'assistant';
   text: string;
-  tools?: { name: string; status: string }[];
+  steps?: ToolStep[];
 }
 
 export interface MapMarker {
@@ -80,7 +97,7 @@ export interface AppState {
   assistantBusy: boolean;
   pushMessage: (message: AssistantMessage) => void;
   appendToLast: (text: string) => void;
-  noteTool: (name: string, status: string) => void;
+  noteTool: (step: ToolStep) => void;
   setAssistantBusy: (busy: boolean) => void;
 }
 
@@ -155,16 +172,17 @@ export const useApp = create<AppState>((set) => ({
       }
       return { messages };
     }),
-  noteTool: (name, status) =>
+  noteTool: (step) =>
     set((s) => {
       const messages = s.messages.slice();
       const last = messages[messages.length - 1];
       if (last && last.role === 'assistant') {
-        const tools = (last.tools ?? []).slice();
-        const existing = tools.findIndex((t) => t.name === name);
-        if (existing >= 0) tools[existing] = { name, status };
-        else tools.push({ name, status });
-        messages[messages.length - 1] = { ...last, tools };
+        const steps = (last.steps ?? []).slice();
+        // a call announces itself, then reports back; merge the two into one row
+        const open = steps.findIndex((t) => t.name === step.name && t.status === 'start');
+        if (open >= 0 && step.status !== 'start') steps[open] = { ...steps[open], ...step };
+        else steps.push(step);
+        messages[messages.length - 1] = { ...last, steps };
       }
       return { messages };
     }),
@@ -176,12 +194,12 @@ export const SUGGESTIONS: Record<Mode, string[]> = {
   explore: [
     'What is 16th and Mission like right now?',
     'Compare the Marina with the Tenderloin',
-    'Where are the most complaints in the city?',
+    'Show me where complaints cluster, on the map',
   ],
   business: [
-    'Where should I open a cafe in the Mission?',
-    'Best place for a gym near Hayes Valley?',
-    'Why is the top site better than the second?',
+    'Where is there unmet demand for an Indian chai house?',
+    'I want to open a natural wine bar. Where, and why?',
+    'Which areas have the most cafes but the least competition?',
   ],
   planner: [
     'What is the land use around Dogpatch?',

@@ -54,9 +54,23 @@ export function startConnection(): void {
         if (msg.done) app.setAssistantBusy(false);
         break;
       }
-      case 'assistantTool':
-        useApp.getState().noteTool(msg.name, msg.status);
+      case 'assistantTool': {
+        const m = msg as unknown as {
+          name: string;
+          status: 'start' | 'ok' | 'error';
+          input?: Record<string, unknown>;
+          summary?: string;
+          sources?: import('../state/appStore').ToolSource[];
+        };
+        useApp.getState().noteTool({
+          name: m.name,
+          status: m.status,
+          input: m.input,
+          summary: m.summary,
+          sources: m.sources,
+        });
         break;
+      }
       case 'mapAction':
         applyMapAction(msg as unknown as MapActionEvent);
         break;
@@ -80,10 +94,10 @@ function applyMapAction(event: MapActionEvent): void {
   const p = event.payload ?? {};
   switch (event.action) {
     case 'flyTo': {
-      const fly = (window as unknown as {
-        __setView?: (c: [number, number], z: number) => void;
-      }).__setView;
-      fly?.([Number(p.lon), Number(p.lat)], Number(p.zoom ?? 15));
+      const camera = (window as unknown as {
+        __setCamera?: (c: Record<string, unknown>) => void;
+      }).__setCamera;
+      camera?.(p);
       break;
     }
     case 'highlight':
@@ -108,6 +122,49 @@ function applyMapAction(event: MapActionEvent): void {
     case 'setLayer':
       app.setLayerOn(String(p.layer), p.on !== false);
       break;
+    case 'setMode':
+      app.setMode(String(p.mode) as never);
+      break;
+    case 'setPanelQuery':
+      if (p.siteCategory !== undefined || p.siteNear !== undefined) {
+        const state = useApp.getState();
+        app.setSiteQuery(
+          String(p.siteCategory ?? state.siteCategory),
+          String(p.siteNear ?? state.siteNear),
+        );
+      }
+      if (p.eventVenue !== undefined) {
+        const state = useApp.getState();
+        app.setEventQuery(
+          String(p.eventVenue),
+          Number(p.eventAttendance ?? state.eventAttendance),
+          Number(p.eventHour ?? state.eventHour),
+        );
+      }
+      break;
+    case 'setSites':
+      app.setSites((p.sites as never) ?? []);
+      break;
+    case 'setEventReport':
+      app.setEventReport((p.report as never) ?? null);
+      break;
+    case 'setToggles': {
+      const sim = useSim.getState();
+      const next: Record<string, boolean> = {};
+      if (p.showAgents !== undefined) next.showAgents = Boolean(p.showAgents);
+      if (p.showDensity !== undefined) next.showDensity = Boolean(p.showDensity);
+      if (Object.keys(next).length) sim.set(next);
+      if (p.showPlaces !== undefined) app.setShowPlaces(Boolean(p.showPlaces));
+      break;
+    }
+    case 'setPlayback': {
+      const sim = useSim.getState();
+      const next: Record<string, unknown> = {};
+      if (p.playing !== undefined) next.playing = Boolean(p.playing);
+      if (p.speed !== undefined) next.speed = Number(p.speed);
+      sim.set(next as never);
+      break;
+    }
     case 'setTime':
       useSim.getState().set({ minute: Number(p.minute) });
       break;

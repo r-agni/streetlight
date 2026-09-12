@@ -104,16 +104,29 @@ export function MapView() {
         center: INITIAL_VIEW.center,
         zoom: INITIAL_VIEW.zoom,
         attributionControl: { compact: true },
-        dragRotate: false,
       });
       mapRef.current = map;
       map.addControl(new NavigationControl({ showCompass: false }), 'bottom-right');
 
-      // camera hook used by panels, the assistant and the screenshot harness
+      // camera hooks used by panels, the assistant and the screenshot harness
       (window as unknown as Record<string, unknown>).__setView = (
         center: [number, number],
         zoom: number,
       ) => map.flyTo({ center, zoom, duration: 900 });
+
+      // the assistant can also rotate and tilt, so it gets the fuller form
+      (window as unknown as Record<string, unknown>).__setCamera = (
+        p: Record<string, unknown>,
+      ) => {
+        const options: Record<string, unknown> = { duration: 900 };
+        if (p.lon !== undefined && p.lat !== undefined) {
+          options.center = [Number(p.lon), Number(p.lat)];
+        }
+        if (p.zoom !== undefined) options.zoom = Number(p.zoom);
+        if (p.bearing !== undefined) options.bearing = Number(p.bearing);
+        if (p.pitch !== undefined) options.pitch = Number(p.pitch);
+        map.flyTo(options as never);
+      };
 
       overlay = new MapboxOverlay({ interleaved: false, layers: [] });
       map.addControl(overlay);

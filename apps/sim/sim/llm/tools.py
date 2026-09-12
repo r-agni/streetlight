@@ -1,12 +1,17 @@
 """Tool implementations the assistant calls.
 
 Each one is a thin adapter: resolve whatever the model said into coordinates,
-call the analysis code, and return both a compact payload for the model and
-any map actions for the browser. No analysis happens here.
+call the analysis code, and return three things - a compact payload for the
+model, any map actions for the browser, and the list of sources it read. No
+analysis happens here.
+
+The sources are declared by the tool rather than described by the model, so the
+trail shown to the user is a record of what was actually touched rather than a
+plausible account of it.
 
 Place names are resolved with Google Geocoding, biased to San Francisco. If no
-key is configured, a small built-in gazetteer of neighbourhoods and landmarks
-covers the common cases so the assistant still works.
+key is configured, a built-in gazetteer of neighbourhoods and landmarks covers
+the common cases so the assistant still works.
 """
 from __future__ import annotations
 
@@ -18,8 +23,15 @@ import numpy as np
 import pandas as pd
 
 from ..analysis import events as events_mod
-from ..analysis import insight, layers
-from .contracts import ToolResult
+from ..analysis import insight, layers, opportunity
+from .contracts import (
+    Source,
+    ToolResult,
+    network_source,
+    open_data_source,
+    places_source,
+    simulation_source,
+)
 
 # fallback when no geocoding key is available
 GAZETTEER = {
@@ -53,6 +65,15 @@ GAZETTEER = {
 }
 
 DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+
+# open-data tables, and the wording used when reporting them
+SECTION_SOURCES = {
+    "complaints": ("311 complaints", "last 12 months"),
+    "incidents": ("Police incidents", "last 12 months"),
+    "vacancy": ("Commercial vacancy filings", "latest filing"),
+    "permits": ("Building permits", "last 3 years"),
+    "landUse": ("Land use and parcels", "assessor roll"),
+}
 
 
 def _google_key() -> str | None:
@@ -102,24 +123,132 @@ def geocode(place: str) -> tuple[float, float, str]:
     return lon, lat, f"{place} (could not be resolved; centred on the city)"
 
 
+def _geocode_source(resolved: str) -> Source:
+    local = "gazetteer" in resolved or "could not be resolved" in resolved
+    return Source(
+        label="Geocoding",
+        kind="reference",
+        detail="Built-in gazetteer" if local else "Google Geocoding, biased to San Francisco",
+    )
+
+
+def _section_sources(report: dict) -> list[Source]:
+    """One source per open-data section the report actually found."""
+    out = []
+    for key, section in (report.get("sections") or {}).items():
+        label, window = SECTION_SOURCES.get(key, (section.get("label", key), None))
+        count = section.get("total") or section.get("parcels")
+        out.append(open_data_source(label, int(count or 0), section.get("window") or window))
+    return out
+
+
+def _dedupe(sources: list[Source]) -> list[Source]:
+    """Merge repeats, summing counts, so a comparison lists each table once."""
+    merged: dict[str, Source] = {}
+    for source in sources:
+        existing = merged.get(source.label)
+        if existing is None:
+            merged[source.label] = Source(
+                label=source.label, kind=source.kind, detail=source.detail,
+                count=source.count, window=source.window,
+            )
+        elif source.count and existing.count:
+            existing.count += source.count
+    return list(merged.values())
+
+
 def build_tools(root: Path, world, sim, hub) -> dict:
     """Bind the tool names in the assistant's schema to real work."""
+
+    enriched = int(np.count_nonzero(world.poi_reviews > 0))
 
     def get_area_report(place: str, radius_metres: float = 300.0) -> ToolResult:
         lon, lat, resolved = geocode(place)
         report = layers.area_report(root, lon, lat, radius_metres)
         report["resolvedPlace"] = resolved
-        report["footfall"] = insight.hourly_footfall(world, sim, lon, lat, radius_m=150.0)
+        foot = insight.hourly_footfall(world, sim, lon, lat, radius_m=150.0)
+        report["footfall"] = foot
         report["places"] = insight.nearby_places(world, lon, lat, radius_metres, limit=12)
         report["placeMix"] = insight.category_mix(world, lon, lat, radius_metres)
+
+        sources = [_geocode_source(resolved), *_section_sources(report)]
+        sources.append(
+            simulation_source(
+                world.n_agents,
+                "Density within 150 m, averaged over "
+                f"{len(foot.get('hoursSimulated', []))} simulated hours",
+            )
+        )
+        sources.append(places_source(world.n_pois, enriched))
         return ToolResult(
             report,
-            [
-                {
-                    "action": "flyTo",
-                    "payload": {"lon": lon, "lat": lat, "zoom": 15.2, "label": resolved},
-                }
-            ],
+            [{"action": "flyTo",
+              "payload": {"lon": lon, "lat": lat, "zoom": 15.2, "label": resolved}}],
+            sources,
+            f"Read everything within {int(radius_metres)} m of {resolved}.",
+        )
+
+    def find_opportunity(concept: str, search_terms: list[str],
+                         areas: list[str] | None = None,
+                         category: str | None = None) -> ToolResult:
+        """Where appetite for a concept outruns what already trades there."""
+        names = areas or [
+            "mission", "soma", "downtown", "hayes valley", "richmond",
+            "sunset", "north beach", "castro", "nob hill", "potrero hill",
+        ]
+        resolved = []
+        for name in names[:10]:
+            lon, lat, label = geocode(name)
+            resolved.append(opportunity.Area(name=label.split(" (")[0], lon=lon, lat=lat))
+
+        result = opportunity.analyse(
+            root, world, sim, concept, list(search_terms), resolved, category
+        )
+        top = result["areas"][:6]
+        markers = [
+            {"label": str(row["rank"]), "lon": row["lon"], "lat": row["lat"]}
+            for row in top
+        ]
+        actions = [
+            {"action": "setMode", "payload": {"mode": "business"}},
+            {"action": "highlight", "payload": {"markers": markers, "kind": "site"}},
+        ]
+        if markers:
+            actions.append(
+                {"action": "flyTo",
+                 "payload": {"lon": markers[0]["lon"], "lat": markers[0]["lat"], "zoom": 13.6}}
+            )
+
+        sources = [
+            places_source(world.n_pois, enriched),
+            simulation_source(world.n_agents, "Footfall and ten-minute catchment per area"),
+            network_source(len(world.node_lon), "Walking catchment by Dijkstra over the street graph"),
+        ]
+        if result.get("listingsSearched"):
+            sources.insert(
+                0,
+                Source(
+                    label="Google Places listings",
+                    kind="recorded",
+                    detail=(
+                        f"Text search for {', '.join(search_terms[:3])} across "
+                        f"{len(resolved)} areas, with ratings and review counts"
+                    ),
+                    count=result.get("listingCalls"),
+                ),
+            )
+        else:
+            sources.insert(
+                0,
+                Source(
+                    label="Listings search",
+                    kind="reference",
+                    detail="No Google key configured; supply counted from the catalog only",
+                ),
+            )
+        return ToolResult(
+            result, actions, sources,
+            f"Weighed {len(resolved)} areas for {concept} against what already trades there.",
         )
 
     def rank_sites(category: str, near: str | None = None, limit: int = 6) -> ToolResult:
@@ -128,23 +257,41 @@ def build_tools(root: Path, world, sim, hub) -> dict:
             return ToolResult({"error": "no candidate sites available"})
         ranked = insight.rank_sites(root, world, sim, category, candidates, limit=limit)
         markers = [
-            {
-                "label": f"{i + 1}. score {r['score']}",
-                "lon": r["location"][0],
-                "lat": r["location"][1],
-            }
-            for i, r in enumerate(ranked)
+            {"label": str(r["rank"]), "lon": r["location"][0], "lat": r["location"][1]}
+            for r in ranked
             if "location" in r
         ]
-        actions = [{"action": "highlight", "payload": {"markers": markers, "kind": "site"}}]
+        actions = [
+            {"action": "setMode", "payload": {"mode": "business"}},
+            {"action": "setPanelQuery",
+             "payload": {"siteCategory": category, "siteNear": near or ""}},
+            {"action": "setSites", "payload": {"sites": ranked}},
+            {"action": "highlight", "payload": {"markers": markers, "kind": "site"}},
+        ]
         if markers:
             actions.append(
-                {
-                    "action": "flyTo",
-                    "payload": {"lon": markers[0]["lon"], "lat": markers[0]["lat"], "zoom": 14.4},
-                }
+                {"action": "flyTo",
+                 "payload": {"lon": markers[0]["lon"], "lat": markers[0]["lat"], "zoom": 14.4}}
             )
-        return ToolResult({"category": category, "ranked": ranked}, actions)
+
+        sources = [
+            open_data_source("Commercial vacancy filings", len(candidates), "latest filing"),
+            simulation_source(world.n_agents, "Footfall within 150 m of each candidate"),
+            network_source(
+                len(world.node_lon),
+                "Ten-minute walking catchment by Dijkstra over the street graph",
+            ),
+            places_source(world.n_pois, enriched),
+        ]
+        if near:
+            sources.insert(0, _geocode_source(geocode(near)[2]))
+        return ToolResult(
+            {"category": category, "ranked": ranked},
+            actions,
+            sources,
+            f"Scored {len(candidates)} vacant parcels for a "
+            f"{category.replace('_', ' ')} against each other.",
+        )
 
     def simulate_event(venue: str, attendance: int = 15000, start_hour: int = 19,
                        day: str = "Friday") -> ToolResult:
@@ -157,23 +304,35 @@ def build_tools(root: Path, world, sim, hub) -> dict:
         )
         result = events_mod.simulate(world, sim, spec)
         result["day"] = DAYS[day_index].capitalize()
+        origins = result.get("attendeeHomeSample", [])
         actions = [
-            {"action": "flyTo", "payload": {"lon": lon, "lat": lat, "zoom": 14.6, "label": resolved}},
-            {
-                "action": "event",
-                "payload": {
-                    "lon": lon, "lat": lat, "label": resolved,
-                    "attendance": int(attendance),
-                    "origins": result.get("attendeeHomeSample", []),
-                },
-            },
+            {"action": "setMode", "payload": {"mode": "events"}},
+            {"action": "setPanelQuery",
+             "payload": {"eventVenue": resolved, "eventAttendance": int(attendance),
+                         "eventHour": start_hour}},
+            {"action": "setEventReport", "payload": {"report": result}},
+            {"action": "flyTo",
+             "payload": {"lon": lon, "lat": lat, "zoom": 14.6, "label": resolved}},
+            {"action": "event",
+             "payload": {"lon": lon, "lat": lat, "label": resolved,
+                         "attendance": int(attendance), "origins": origins}},
         ]
         result.pop("attendeeHomeSample", None)  # drawn, not narrated
-        return ToolResult(result, actions)
+        sources = [
+            _geocode_source(resolved),
+            simulation_source(
+                world.n_agents,
+                "Attendance drawn from agent home locations by distance decay",
+            ),
+            places_source(world.n_pois, enriched),
+        ]
+        return ToolResult(
+            result, actions, sources,
+            f"Modelled {int(attendance):,} people at {resolved} starting {start_hour:02d}:00.",
+        )
 
     def compare_areas(places: list[str]) -> ToolResult:
-        rows = []
-        markers = []
+        rows, markers, sources = [], [], []
         for place in places[:4]:
             lon, lat, resolved = geocode(place)
             report = layers.area_report(root, lon, lat, 300.0)
@@ -191,22 +350,32 @@ def build_tools(root: Path, world, sim, hub) -> dict:
                 }
             )
             markers.append({"label": resolved, "lon": lon, "lat": lat})
+            sources.extend(_section_sources(report))
+        sources.append(simulation_source(world.n_agents, "Footfall within 150 m of each place"))
         return ToolResult(
             {"comparison": rows},
             [{"action": "highlight", "payload": {"markers": markers, "kind": "compare"}}],
+            _dedupe(sources),
+            f"Compared {len(rows)} places on footfall, complaints, incidents and vacancy.",
         )
 
     def show_on_map(place: str, zoom: float = 15.0, markers: list | None = None,
                     layer: str | None = None) -> ToolResult:
         lon, lat, resolved = geocode(place)
         actions = [
-            {"action": "flyTo", "payload": {"lon": lon, "lat": lat, "zoom": zoom, "label": resolved}}
+            {"action": "flyTo",
+             "payload": {"lon": lon, "lat": lat, "zoom": zoom, "label": resolved}}
         ]
         if markers:
             actions.append({"action": "highlight", "payload": {"markers": markers, "kind": "pin"}})
         if layer:
             actions.append({"action": "setLayer", "payload": {"layer": layer, "on": True}})
-        return ToolResult({"shown": resolved, "lon": lon, "lat": lat}, actions)
+        return ToolResult(
+            {"shown": resolved, "lon": lon, "lat": lat},
+            actions,
+            [_geocode_source(resolved)],
+            f"Moved the map to {resolved}.",
+        )
 
     def set_time(hour: int, day: str = "Tuesday", minute: int = 0) -> ToolResult:
         day_index = DAYS.index(day.lower()) if day.lower() in DAYS else 1
@@ -215,15 +384,99 @@ def build_tools(root: Path, world, sim, hub) -> dict:
         return ToolResult(
             {"nowShowing": f"{day.capitalize()} {hour:02d}:{minute:02d}"},
             [{"action": "setTime", "payload": {"minute": target}}],
+            [simulation_source(world.n_agents, "Clock moved; the day replays to that minute")],
+            f"Set the clock to {day.capitalize()} {hour:02d}:{minute:02d}.",
+        )
+
+    def control_interface(
+        mode: str | None = None,
+        layers_on: list[str] | None = None,
+        layers_off: list[str] | None = None,
+        show_places: bool | None = None,
+        show_people: bool | None = None,
+        show_density: bool | None = None,
+        playing: bool | None = None,
+        speed: int | None = None,
+        centre_on: str | None = None,
+        zoom: float | None = None,
+        bearing: float | None = None,
+        pitch: float | None = None,
+        clear_drawing: bool | None = None,
+    ) -> ToolResult:
+        """Drive the interface itself: tabs, switches, playback and camera."""
+        actions: list[dict] = []
+        did: list[str] = []
+
+        if mode:
+            actions.append({"action": "setMode", "payload": {"mode": mode}})
+            did.append(f"opened the {mode} panel")
+
+        for name in layers_on or []:
+            actions.append({"action": "setLayer", "payload": {"layer": name, "on": True}})
+        for name in layers_off or []:
+            actions.append({"action": "setLayer", "payload": {"layer": name, "on": False}})
+        if layers_on:
+            did.append("switched on " + ", ".join(layers_on))
+        if layers_off:
+            did.append("switched off " + ", ".join(layers_off))
+
+        toggles: dict = {}
+        if show_places is not None:
+            toggles["showPlaces"] = show_places
+        if show_people is not None:
+            toggles["showAgents"] = show_people
+        if show_density is not None:
+            toggles["showDensity"] = show_density
+        if toggles:
+            actions.append({"action": "setToggles", "payload": toggles})
+            did.append("adjusted the map switches")
+
+        if playing is not None or speed is not None:
+            payload: dict = {}
+            if playing is not None:
+                hub.playing = bool(playing)
+                payload["playing"] = bool(playing)
+            if speed is not None:
+                hub.speed = float(np.clip(float(speed), 1.0, 600.0))
+                payload["speed"] = hub.speed
+            actions.append({"action": "setPlayback", "payload": payload})
+            did.append("changed playback")
+
+        if centre_on or zoom is not None or bearing is not None or pitch is not None:
+            camera: dict = {}
+            if centre_on:
+                lon, lat, resolved = geocode(centre_on)
+                camera.update({"lon": lon, "lat": lat, "label": resolved})
+                did.append(f"moved the map to {resolved}")
+            if zoom is not None:
+                camera["zoom"] = float(zoom)
+            if bearing is not None:
+                camera["bearing"] = float(bearing)
+            if pitch is not None:
+                camera["pitch"] = float(pitch)
+            actions.append({"action": "flyTo", "payload": camera})
+
+        if clear_drawing:
+            actions.append({"action": "clear", "payload": {}})
+            did.append("cleared the drawing")
+
+        return ToolResult(
+            {"applied": did or ["nothing to change"]},
+            actions,
+            [Source(label="Interface", kind="derived",
+                    detail="Panels, switches, playback and camera")],
+            "; ".join(did) if did else "No interface change requested.",
         )
 
     return {
         "get_area_report": get_area_report,
+        "find_opportunity": find_opportunity,
         "rank_sites": rank_sites,
         "simulate_event": simulate_event,
         "compare_areas": compare_areas,
         "show_on_map": show_on_map,
         "set_time": set_time,
+        "control_interface": control_interface,
     }
 
 

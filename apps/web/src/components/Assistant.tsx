@@ -10,6 +10,7 @@ import { CornerDownLeft, Loader2, Sparkles } from 'lucide-react';
 
 import { connection } from '../sim/connection';
 import { SUGGESTIONS, useApp } from '../state/appStore';
+import { ToolTrail } from './ToolTrail';
 
 export function Assistant() {
   const [draft, setDraft] = useState('');
@@ -48,9 +49,10 @@ export function Assistant() {
         {messages.length === 0 && (
           <div className="space-y-2">
             <p className="text-[12px] leading-relaxed text-[var(--color-ink-soft)]">
-              Questions are answered from the running simulation and San Francisco
-              open data. Answers say which numbers are modelled and which are
-              recorded.
+              Ask in your own words. The assistant searches real listings, the
+              running simulation and San Francisco open data, and shows every
+              source it used. If a question is too vague to answer well, it will
+              ask you something back rather than guess.
             </p>
             {SUGGESTIONS[mode].map((s) => (
               <button
@@ -74,23 +76,7 @@ export function Assistant() {
             </div>
           ) : (
             <div key={i} className="space-y-1.5">
-              {!!m.tools?.length && (
-                <div className="flex flex-wrap gap-1">
-                  {m.tools.map((t) => (
-                    <span
-                      key={t.name}
-                      className={[
-                        'rounded-[6px] px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-[0.06em]',
-                        t.status === 'error'
-                          ? 'bg-[#e8384f]/12 text-[#c02a3f]'
-                          : 'bg-[var(--color-ink-blue)]/10 text-[var(--color-ink-blue)]',
-                      ].join(' ')}
-                    >
-                      {t.name.replace(/_/g, ' ')}
-                    </span>
-                  ))}
-                </div>
-              )}
+              {!!m.steps?.length && <ToolTrail steps={m.steps} />}
               <div className="whitespace-pre-wrap text-[12.5px] leading-relaxed">
                 {m.text || (
                   <span className="text-[var(--color-ink-soft)]">thinking…</span>
@@ -113,7 +99,7 @@ export function Assistant() {
               }
             }}
             rows={2}
-            placeholder="Where should I open a cafe in the Mission?"
+            placeholder="Where is there demand for an Indian chai house?"
             className="flex-1 resize-none bg-transparent text-[12.5px] leading-snug outline-none placeholder:text-[var(--color-ink-soft)]"
           />
           <button
