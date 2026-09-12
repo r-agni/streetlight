@@ -13,3 +13,4 @@ apps/web/public/tiles/*.pmtiles
 apps/web/public/sprites/*.png
 .vite/
 .DS_Store
+data/*.log
