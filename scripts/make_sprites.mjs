@@ -60,20 +60,32 @@ const VEHICLES = [
   { id: 'bike', body: '#00a878', length: 7, width: 3, windows: 0 },
 ];
 
-/** Place markers, one per category group, as little pixel signs. */
+/** Place markers, one per catalog category, as little pixel signs. */
 const PLACES = {
   cafe: { ink: '#8b5a2b', glyph: 'cup' },
   restaurant: { ink: '#e8384f', glyph: 'plate' },
+  fast_food: { ink: '#f2683c', glyph: 'burger' },
   bar: { ink: '#8b3dff', glyph: 'glass' },
-  grocery: { ink: '#00a878', glyph: 'bag' },
+  nightclub: { ink: '#6d1fd6', glyph: 'note' },
+  grocery: { ink: '#00a878', glyph: 'cart' },
+  convenience: { ink: '#3fb98a', glyph: 'bag' },
   retail: { ink: '#f5b301', glyph: 'bag' },
+  clothing: { ink: '#e0a21a', glyph: 'shirt' },
+  pharmacy: { ink: '#1fa6a6', glyph: 'cross' },
   office: { ink: '#2323e5', glyph: 'tower' },
-  park: { ink: '#2f8f4e', glyph: 'tree' },
   school: { ink: '#00a6c0', glyph: 'book' },
-  hotel: { ink: '#ff6a13', glyph: 'bed' },
-  transit_stop: { ink: '#1a1a28', glyph: 'stop' },
+  university: { ink: '#0087a8', glyph: 'cap' },
+  library: { ink: '#3a6ea5', glyph: 'book' },
+  park: { ink: '#2f8f4e', glyph: 'tree' },
   gym: { ink: '#e8384f', glyph: 'weight' },
-  museum: { ink: '#8b3dff', glyph: 'tower' },
+  museum: { ink: '#8b3dff', glyph: 'frame' },
+  theatre: { ink: '#a63ddb', glyph: 'masks' },
+  cinema: { ink: '#7a2fc4', glyph: 'film' },
+  hotel: { ink: '#ff6a13', glyph: 'bed' },
+  clinic: { ink: '#d9455f', glyph: 'cross' },
+  bank: { ink: '#5b6b7a', glyph: 'coin' },
+  worship: { ink: '#6b6b73', glyph: 'spire' },
+  transit_stop: { ink: '#00a6c0', glyph: 'stop' },
 };
 
 /* ── pixel helpers ───────────────────────────────────────────────────── */
@@ -262,6 +274,61 @@ function drawPlace(px, spec) {
     case 'stop':
       g(3, 1, 2, 5);
       g(2, 1, 4, 2);
+      break;
+    case 'burger':
+      g(2, 2, 4, 1);
+      g(2, 3, 4, 1, '#ffffff');
+      g(2, 4, 4, 1);
+      break;
+    case 'note':
+      g(4, 1, 1, 4);
+      g(2, 4, 3, 2);
+      g(4, 1, 2, 1);
+      break;
+    case 'cart':
+      g(2, 2, 4, 2);
+      g(2, 5, 1, 1);
+      g(5, 5, 1, 1);
+      break;
+    case 'shirt':
+      g(2, 2, 4, 4);
+      g(1, 2, 1, 2);
+      g(6, 2, 1, 2);
+      g(3, 2, 2, 1, '#ffffff');
+      break;
+    case 'cross':
+      g(3, 1, 2, 5);
+      g(1, 3, 6, 1);
+      break;
+    case 'cap':
+      g(1, 3, 6, 1);
+      g(3, 2, 2, 1);
+      g(6, 3, 1, 3);
+      break;
+    case 'frame':
+      g(1, 1, 6, 5);
+      g(2, 2, 4, 3, '#ffffff');
+      g(3, 3, 2, 1);
+      break;
+    case 'masks':
+      g(1, 2, 3, 4);
+      g(4, 2, 3, 4);
+      g(2, 3, 1, 1, '#ffffff');
+      g(5, 3, 1, 1, '#ffffff');
+      break;
+    case 'film':
+      g(1, 2, 6, 4);
+      g(2, 3, 1, 1, '#ffffff');
+      g(4, 3, 1, 1, '#ffffff');
+      g(2, 5, 1, 1, '#ffffff');
+      break;
+    case 'coin':
+      g(2, 2, 4, 4);
+      g(3, 3, 2, 2, '#ffffff');
+      break;
+    case 'spire':
+      g(3, 0, 2, 6);
+      g(2, 3, 4, 1);
       break;
     case 'weight':
       g(2, 3, 1, 2);

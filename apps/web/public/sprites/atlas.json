@@ -36,16 +36,28 @@
  "places": {
   "cafe": "#8b5a2b",
   "restaurant": "#e8384f",
+  "fast_food": "#f2683c",
   "bar": "#8b3dff",
+  "nightclub": "#6d1fd6",
   "grocery": "#00a878",
+  "convenience": "#3fb98a",
   "retail": "#f5b301",
+  "clothing": "#e0a21a",
+  "pharmacy": "#1fa6a6",
   "office": "#2323e5",
-  "park": "#2f8f4e",
   "school": "#00a6c0",
-  "hotel": "#ff6a13",
-  "transit_stop": "#1a1a28",
+  "university": "#0087a8",
+  "library": "#3a6ea5",
+  "park": "#2f8f4e",
   "gym": "#e8384f",
-  "museum": "#8b3dff"
+  "museum": "#8b3dff",
+  "theatre": "#a63ddb",
+  "cinema": "#7a2fc4",
+  "hotel": "#ff6a13",
+  "clinic": "#d9455f",
+  "bank": "#5b6b7a",
+  "worship": "#6b6b73",
+  "transit_stop": "#00a6c0"
  },
  "mapping": {
   "office_down_0": {
@@ -1254,7 +1266,7 @@
    "anchorY": 59,
    "mask": false
   },
-  "p_bar": {
+  "p_fast_food": {
    "x": 384,
    "y": 512,
    "width": 64,
@@ -1263,7 +1275,7 @@
    "anchorY": 59,
    "mask": false
   },
-  "p_grocery": {
+  "p_bar": {
    "x": 448,
    "y": 512,
    "width": 64,
@@ -1272,7 +1284,7 @@
    "anchorY": 59,
    "mask": false
   },
-  "p_retail": {
+  "p_nightclub": {
    "x": 512,
    "y": 512,
    "width": 64,
@@ -1281,7 +1293,7 @@
    "anchorY": 59,
    "mask": false
   },
-  "p_office": {
+  "p_grocery": {
    "x": 576,
    "y": 512,
    "width": 64,
@@ -1290,7 +1302,7 @@
    "anchorY": 59,
    "mask": false
   },
-  "p_park": {
+  "p_convenience": {
    "x": 640,
    "y": 512,
    "width": 64,
@@ -1299,7 +1311,7 @@
    "anchorY": 59,
    "mask": false
   },
-  "p_school": {
+  "p_retail": {
    "x": 704,
    "y": 512,
    "width": 64,
@@ -1308,7 +1320,7 @@
    "anchorY": 59,
    "mask": false
   },
-  "p_hotel": {
+  "p_clothing": {
    "x": 768,
    "y": 512,
    "width": 64,
@@ -1317,7 +1329,7 @@
    "anchorY": 59,
    "mask": false
   },
-  "p_transit_stop": {
+  "p_pharmacy": {
    "x": 832,
    "y": 512,
    "width": 64,
@@ -1326,7 +1338,7 @@
    "anchorY": 59,
    "mask": false
   },
-  "p_gym": {
+  "p_office": {
    "x": 896,
    "y": 512,
    "width": 64,
@@ -1335,9 +1347,117 @@
    "anchorY": 59,
    "mask": false
   },
-  "p_museum": {
+  "p_school": {
    "x": 960,
    "y": 512,
+   "width": 64,
+   "height": 64,
+   "anchorX": 32,
+   "anchorY": 59,
+   "mask": false
+  },
+  "p_university": {
+   "x": 0,
+   "y": 576,
+   "width": 64,
+   "height": 64,
+   "anchorX": 32,
+   "anchorY": 59,
+   "mask": false
+  },
+  "p_library": {
+   "x": 64,
+   "y": 576,
+   "width": 64,
+   "height": 64,
+   "anchorX": 32,
+   "anchorY": 59,
+   "mask": false
+  },
+  "p_park": {
+   "x": 128,
+   "y": 576,
+   "width": 64,
+   "height": 64,
+   "anchorX": 32,
+   "anchorY": 59,
+   "mask": false
+  },
+  "p_gym": {
+   "x": 192,
+   "y": 576,
+   "width": 64,
+   "height": 64,
+   "anchorX": 32,
+   "anchorY": 59,
+   "mask": false
+  },
+  "p_museum": {
+   "x": 256,
+   "y": 576,
+   "width": 64,
+   "height": 64,
+   "anchorX": 32,
+   "anchorY": 59,
+   "mask": false
+  },
+  "p_theatre": {
+   "x": 320,
+   "y": 576,
+   "width": 64,
+   "height": 64,
+   "anchorX": 32,
+   "anchorY": 59,
+   "mask": false
+  },
+  "p_cinema": {
+   "x": 384,
+   "y": 576,
+   "width": 64,
+   "height": 64,
+   "anchorX": 32,
+   "anchorY": 59,
+   "mask": false
+  },
+  "p_hotel": {
+   "x": 448,
+   "y": 576,
+   "width": 64,
+   "height": 64,
+   "anchorX": 32,
+   "anchorY": 59,
+   "mask": false
+  },
+  "p_clinic": {
+   "x": 512,
+   "y": 576,
+   "width": 64,
+   "height": 64,
+   "anchorX": 32,
+   "anchorY": 59,
+   "mask": false
+  },
+  "p_bank": {
+   "x": 576,
+   "y": 576,
+   "width": 64,
+   "height": 64,
+   "anchorX": 32,
+   "anchorY": 59,
+   "mask": false
+  },
+  "p_worship": {
+   "x": 640,
+   "y": 576,
+   "width": 64,
+   "height": 64,
+   "anchorX": 32,
+   "anchorY": 59,
+   "mask": false
+  },
+  "p_transit_stop": {
+   "x": 704,
+   "y": 576,
    "width": 64,
    "height": 64,
    "anchorX": 32,

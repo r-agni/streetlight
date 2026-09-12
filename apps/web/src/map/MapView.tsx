@@ -44,6 +44,12 @@ const LAYER_INK: Record<string, string> = {
 /** Cell side is roughly 100 m, so this keeps neighbouring dots from merging. */
 const MAX_DOT_METRES = 52;
 
+/** Above this zoom a place is drawn as a pixel sign rather than a dot. */
+const PLACE_SIGN_ZOOM = 15.2;
+
+/** More signs than this on screen and the street is unreadable. */
+const MAX_PLACE_SIGNS = 900;
+
 /** Density and individuals trade places as the viewer zooms. */
 const DENSITY_FADE_START = 13.0;
 const DENSITY_FADE_END = 14.8;
@@ -86,6 +92,8 @@ export function MapView() {
     let placeCount = 0;
     let placeColours = new Uint8Array(0);
     let placePositions: Float32Array<ArrayBuffer> = new Float32Array(0);
+    let placeCategories: string[] = [];
+    let placeSigns: { i: number }[] = [];
 
     let frames = 0;
     let fpsWindow = performance.now();
@@ -158,7 +166,9 @@ export function MapView() {
           placeCount = p.lon.length;
           placePositions = new Float32Array(placeCount * 2);
           placeColours = new Uint8Array(placeCount * 4);
+          placeCategories = new Array(placeCount);
           for (let i = 0; i < placeCount; i++) {
+            placeCategories[i] = p.categories[p.cat[i]] ?? '';
             placePositions[i * 2] = p.lon[i];
             placePositions[i * 2 + 1] = p.lat[i];
             const [r, g, b] = rgba(categoryColour(p.categories[p.cat[i]] ?? ''));
@@ -252,27 +262,82 @@ export function MapView() {
           );
         }
 
-        // ---- places, coloured by what they are ---------------------------
+        // ---- places -------------------------------------------------------
+        // Dots while the whole city is in view, because a sign at that size is
+        // an unreadable smudge. Pixel signs once a street is legible, because
+        // by then the category matters more than the density.
         if (app.showPlaces && placeCount > 0 && zoom >= 13.2) {
-          layers.push(
-            new ScatterplotLayer({
-              id: 'places',
-              data: {
-                length: placeCount,
-                attributes: {
-                  getPosition: { value: placePositions, size: 2 },
-                  getFillColor: { value: placeColours, size: 4, normalized: true },
+          const signsActive = atlas !== null && zoom >= PLACE_SIGN_ZOOM;
+          const placeDotOpacity = signsActive
+            ? clamp01((PLACE_SIGN_ZOOM + 0.9 - zoom) / 0.9)
+            : 1;
+
+          if (placeDotOpacity > 0.01) {
+            layers.push(
+              new ScatterplotLayer({
+                id: 'places',
+                data: {
+                  length: placeCount,
+                  attributes: {
+                    getPosition: { value: placePositions, size: 2 },
+                    getFillColor: { value: placeColours, size: 4, normalized: true },
+                  },
                 },
-              },
-              getRadius: 1,
-              radiusUnits: 'pixels',
-              radiusMinPixels: zoom < 15 ? 1.4 : 2.6,
-              radiusMaxPixels: 5,
-              opacity: clamp01((zoom - 13.2) / 1.2),
-              stroked: false,
-              pickable: false,
-            }),
-          );
+                getRadius: 1,
+                radiusUnits: 'pixels',
+                radiusMinPixels: zoom < 15 ? 1.4 : 2.6,
+                radiusMaxPixels: 5,
+                opacity: clamp01((zoom - 13.2) / 1.2) * placeDotOpacity,
+                stroked: false,
+                pickable: false,
+              }),
+            );
+          }
+
+          if (signsActive && placeCategories.length) {
+            const b = map.getBounds();
+            const padLon = (b.getEast() - b.getWest()) * 0.06;
+            const padLat = (b.getNorth() - b.getSouth()) * 0.06;
+            const west = b.getWest() - padLon;
+            const east = b.getEast() + padLon;
+            const south = b.getSouth() - padLat;
+            const north = b.getNorth() + padLat;
+
+            // only what is on screen, and only as many as stay readable
+            if (placeSigns.length !== MAX_PLACE_SIGNS) {
+              placeSigns = Array.from({ length: MAX_PLACE_SIGNS }, () => ({ i: 0 }));
+            }
+            let found = 0;
+            for (let i = 0; i < placeCount && found < MAX_PLACE_SIGNS; i++) {
+              const lon = placePositions[i * 2];
+              const lat = placePositions[i * 2 + 1];
+              if (lon < west || lon > east || lat < south || lat > north) continue;
+              if (!atlas!.mapping[`p_${placeCategories[i]}`]) continue;
+              placeSigns[found++].i = i;
+            }
+            const visible = placeSigns.slice(0, found);
+
+            layers.push(
+              new IconLayer({
+                id: 'place-signs',
+                data: visible,
+                iconAtlas: '/sprites/atlas.png',
+                iconMapping: atlas!.mapping,
+                getPosition: (d: { i: number }) => [
+                  placePositions[d.i * 2],
+                  placePositions[d.i * 2 + 1],
+                ],
+                getIcon: (d: { i: number }) => `p_${placeCategories[d.i]}`,
+                getSize: zoom < 16 ? 20 : zoom < 17.5 ? 27 : 34,
+                sizeUnits: 'pixels',
+                billboard: false,
+                alphaCutoff: 0.05,
+                opacity: clamp01((zoom - PLACE_SIGN_ZOOM) / 0.7),
+                pickable: false,
+                updateTriggers: { getIcon: found, getPosition: found },
+              }),
+            );
+          }
         }
 
         // ---- agents as dots ----------------------------------------------

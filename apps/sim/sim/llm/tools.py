@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 
 from ..analysis import events as events_mod
-from ..analysis import insight, layers, opportunity, research
+from ..analysis import insight, layers, opportunity, research, websearch
 from .contracts import (
     Source,
     ToolResult,
@@ -387,6 +387,75 @@ def build_tools(root: Path, world, sim, hub) -> dict:
             f"Fetched live listings, review text and vacancy for {topic} in {resolved}.",
         )
 
+    def search_public_discussion(topic: str, place: str = "San Francisco",
+                                 include_press: bool = True) -> ToolResult:
+        """Read Reddit, Facebook and local press through hosted web search."""
+        community = websearch.community_sentiment(topic, place)
+        press = websearch.local_demand(topic, place) if include_press else {"available": False}
+
+        sources: list[Source] = []
+        warnings: list[str] = []
+
+        for label, result in (("Reddit and Facebook", community), ("Press and blogs", press)):
+            if not result.get("available"):
+                if result.get("reason"):
+                    sources.append(
+                        Source(label=label, kind="reference",
+                               detail="Not reachable: " + str(result["reason"])[:140])
+                    )
+                continue
+            cited = ", ".join(result.get("platformsCited") or []) or "web pages"
+            sources.append(
+                Source(
+                    label=label,
+                    kind="reference",
+                    detail=(
+                        "Hosted web search, summarised with links from "
+                        + cited
+                        + ". Not fetched from the platform directly."
+                    ),
+                    count=len(result.get("citations") or []),
+                )
+            )
+            if result.get("attributionWarning"):
+                warnings.append(result["attributionWarning"])
+
+        payload = {
+            "topic": topic,
+            "place": place,
+            "community": {
+                "summary": community.get("summary"),
+                "citations": community.get("citations"),
+                "trustworthy": community.get("trustworthy"),
+                "attributionWarning": community.get("attributionWarning"),
+                "queriesRun": community.get("queriesRun"),
+                "reason": community.get("reason"),
+            },
+            "press": {
+                "summary": press.get("summary"),
+                "citations": press.get("citations"),
+                "trustworthy": press.get("trustworthy"),
+                "attributionWarning": press.get("attributionWarning"),
+                "reason": press.get("reason"),
+            },
+            "howToUseThis": (
+                "These are search results summarised by a model, with links, not "
+                "posts fetched from Reddit or Facebook. Quote something only if a "
+                "citation points at the platform it is attributed to. Where an "
+                "attribution warning is present, say the discussion could not be "
+                "verified instead of repeating the quote."
+            ),
+        }
+        if warnings:
+            payload["warnings"] = warnings
+
+        return ToolResult(
+            payload,
+            [],
+            sources,
+            f"Searched public discussion and press for {topic} in {place}.",
+        )
+
     def rank_sites(category: str, near: str | None = None, limit: int = 6) -> ToolResult:
         candidates = _candidate_frame(root, world, near)
         if candidates.empty:
@@ -608,6 +677,7 @@ def build_tools(root: Path, world, sim, hub) -> dict:
         "get_area_report": get_area_report,
         "find_opportunity": find_opportunity,
         "research_demand": research_demand,
+        "search_public_discussion": search_public_discussion,
         "rank_sites": rank_sites,
         "simulate_event": simulate_event,
         "compare_areas": compare_areas,

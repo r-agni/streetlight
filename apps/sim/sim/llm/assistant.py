@@ -65,6 +65,11 @@ TOOLS
   current listings, customer review text, vacancies nearby, and who lives
   there. Call it after find_opportunity to back the recommendation up, and
   quote the reviews and name the businesses in your answer.
+- search_public_discussion: what people say on Reddit, Facebook and in local
+  press, via hosted web search. This is a summary with links, not posts pulled
+  from the platform, so quote something only when a link points at the platform
+  it is attributed to. If the tool returns an attribution warning, tell the user
+  the discussion could not be verified rather than repeating the quote.
 - rank_sites: score real vacant parcels for a category.
 - simulate_event: who comes to a large event, from where, and what fills up.
 - compare_areas: two to four places side by side.
@@ -177,6 +182,31 @@ def tool_definitions() -> list[dict]:
                     },
                 },
                 "required": ["topic", "place"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "search_public_discussion",
+            "description": (
+                "Read what people say publicly about a topic on Reddit, Facebook "
+                "and in local press, through hosted web search. Returns a summary "
+                "with links, plus a warning when the summary talks about a "
+                "platform none of its links come from. Use it for demand signal "
+                "that listings and ratings cannot show: what people complain is "
+                "missing, which places get recommended by name, which "
+                "neighbourhood a concept is associated with."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "topic": {
+                        "type": "string",
+                        "description": "The concept, for example 'Indian chai house'.",
+                    },
+                    "place": {"type": "string", "default": "San Francisco"},
+                    "include_press": {"type": "boolean", "default": True},
+                },
+                "required": ["topic"],
                 "additionalProperties": False,
             },
         },
