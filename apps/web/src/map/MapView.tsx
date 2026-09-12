@@ -278,7 +278,7 @@ export function MapView() {
               pickable: false,
               updateTriggers: {
                 getPosition: interpolator.revision,
-                getIcon: Math.floor(seconds * 12),
+                getIcon: Math.floor(seconds * 8),
                 getColor: interpolator.revision,
               },
             }),

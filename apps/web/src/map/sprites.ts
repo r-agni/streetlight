@@ -27,7 +27,7 @@ export interface SpriteAtlas {
 export const SPRITE_ZOOM = 14.9;
 
 /** Above this many on-screen figures, the view is a crowd and dots read better. */
-const MAX_SPRITES = 4000;
+const MAX_SPRITES = 2500;
 
 /** Walk cycles per simulated minute of travel. */
 const CYCLES_PER_SECOND = 1.35;
@@ -87,7 +87,12 @@ export function iconNameFor(
   const facing = angleDegrees > 90 && angleDegrees < 270 ? 'l' : 'r';
   const mode = modeOf(packedSegment);
 
-  if (mode === TravelMode.Transit) return `bus_${Math.floor(seconds * 4) % 2}_${facing}`;
+  // A car or a bicycle carries the one person it is drawn for, so those icons
+  // are literally true. A bus is not: transit riders are individuals, and this
+  // model has no vehicles of its own - riders move along street geometry at a
+  // transit speed. Drawing one bus per rider put thousands of buses on
+  // residential streets, so riders are drawn as the people they are. Real
+  // vehicles need the regional GTFS feed, which is not wired up yet.
   if (mode === TravelMode.Car) return `car_${Math.floor(seconds * 6) % 2}_${facing}`;
   if (mode === TravelMode.Bike) return `bike_${Math.floor(seconds * 5) % 2}_${facing}`;
 
