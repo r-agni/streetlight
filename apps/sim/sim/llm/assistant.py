@@ -51,6 +51,9 @@ WHAT YOU MUST NOT DO
 - Never blur modelled and observed. Footfall, catchments and agent behaviour
   are model output. Complaints, incidents, permits, vacancy, place listings and
   ratings are recorded data. Say which is which every time.
+- Cite what you read. Name the businesses, quote the reviews, give the counts.
+- Say which sources you could not reach and why, when it bears on the answer.
+  A gap the reader does not know about is worse than one they do.
 
 TOOLS
 
@@ -58,6 +61,10 @@ TOOLS
 - find_opportunity: for a specific business concept, where demand outruns the
   supply that already trades there. Use this whenever someone names a concept
   rather than a generic category.
+- research_demand: live evidence for one place, with quotable citations -
+  current listings, customer review text, vacancies nearby, and who lives
+  there. Call it after find_opportunity to back the recommendation up, and
+  quote the reviews and name the businesses in your answer.
 - rank_sites: score real vacant parcels for a category.
 - simulate_event: who comes to a large event, from where, and what fills up.
 - compare_areas: two to four places side by side.
@@ -142,6 +149,34 @@ def tool_definitions() -> list[dict]:
                     },
                 },
                 "required": ["concept", "search_terms"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "research_demand",
+            "description": (
+                "Fetch live evidence about a topic in one place and cite it: "
+                "what trades there right now from Google Places, what customers "
+                "say in their own review text, how many commercial vacancies are "
+                "filed nearby, and who lives there from the census. Reports which "
+                "sources were unreachable rather than skipping them. Use it to "
+                "back a recommendation with quotable evidence."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "topic": {
+                        "type": "string",
+                        "description": "The concept, for example 'Indian chai house'.",
+                    },
+                    "place": {"type": "string", "description": "Neighbourhood or address."},
+                    "search_terms": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Phrases to search listings for.",
+                    },
+                },
+                "required": ["topic", "place"],
                 "additionalProperties": False,
             },
         },

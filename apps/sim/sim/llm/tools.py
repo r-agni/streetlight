@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 
 from ..analysis import events as events_mod
-from ..analysis import insight, layers, opportunity
+from ..analysis import insight, layers, opportunity, research
 from .contracts import (
     Source,
     ToolResult,
@@ -251,6 +251,142 @@ def build_tools(root: Path, world, sim, hub) -> dict:
             f"Weighed {len(resolved)} areas for {concept} against what already trades there.",
         )
 
+    def research_demand(topic: str, place: str,
+                        search_terms: list[str] | None = None) -> ToolResult:
+        """Fetch live evidence about a topic in one place, and cite it."""
+        lon, lat, resolved = geocode(place)
+        terms = list(search_terms or [topic])
+        found = research.ResearchResult()
+
+        # 1. what trades there right now
+        listings: list[dict] = []
+        for term in terms[:3]:
+            listings.extend(research.search_listings(f"{term} in {resolved}", lon, lat))
+        seen: set[str] = set()
+        unique: list[dict] = []
+        for entry in listings:
+            name = (entry.get("name") or "").lower()
+            if name and name not in seen:
+                seen.add(name)
+                unique.append(entry)
+        unique.sort(key=lambda e: -(e.get("reviews") or 0))
+
+        for entry in unique[:8]:
+            found.citations.append(
+                research.Citation(
+                    source="Google Places",
+                    title=entry["name"],
+                    detail=entry.get("address", ""),
+                    rating=entry.get("rating"),
+                    reviews=entry.get("reviews"),
+                )
+            )
+
+        # 2. what customers say about the busiest of them
+        quotes: list[dict] = []
+        for entry in unique[:3]:
+            for review in research.fetch_reviews(entry.get("id") or "", limit=2):
+                quotes.append(review)
+                found.citations.append(
+                    research.Citation(
+                        source="Google review",
+                        title=review["place"],
+                        detail=review["text"][:240],
+                        rating=review.get("rating"),
+                    )
+                )
+
+        # 3. who lives there
+        demographics = research.census_tracts([])
+        if not demographics.get("available"):
+            found.unavailable.append(
+                {"source": "Census ACS", "reason": demographics.get("reason", "")}
+            )
+
+        # 4. public discussion
+        talk = research.discussion(f"{topic} san francisco")
+        if talk.get("available"):
+            for post in talk["posts"]:
+                found.citations.append(
+                    research.Citation(
+                        source=f"Reddit r/{post['subreddit']}",
+                        title=post["title"],
+                        url=post["url"],
+                        detail=f"{post['score']} points",
+                    )
+                )
+        else:
+            found.unavailable.append({"source": "Reddit", "reason": talk.get("reason", "")})
+            found.unavailable.append(
+                {"source": "Facebook", "reason": "No public search API exists."}
+            )
+
+        # 5. what sits empty nearby
+        vacancy = layers.area_report(root, lon, lat, 600.0).get("sections", {}).get("vacancy")
+        if vacancy:
+            found.notes.append(
+                f"{vacancy['total']:,} commercial vacancy filings sit within 600 m."
+            )
+
+        payload = {
+            "topic": topic,
+            "place": resolved,
+            "tradingNow": unique[:8],
+            "customerQuotes": quotes[:6],
+            "vacancyNearby": (vacancy or {}).get("total", 0),
+            "demographics": demographics,
+            **found.to_dict(),
+        }
+
+        sources = [_geocode_source(resolved)]
+        if unique:
+            sources.append(
+                Source(
+                    label="Google Places listings",
+                    kind="recorded",
+                    detail="Live text search for " + ", ".join(terms[:3]),
+                    count=len(unique),
+                )
+            )
+        if quotes:
+            sources.append(
+                Source(
+                    label="Google review text",
+                    kind="recorded",
+                    detail="Customer reviews of the busiest competitors",
+                    count=len(quotes),
+                )
+            )
+        if demographics.get("available"):
+            sources.append(
+                Source(
+                    label="Census ACS 2023",
+                    kind="recorded",
+                    detail="Tract population, income, rent and detailed origin",
+                    count=len(demographics.get("tracts", [])),
+                )
+            )
+        if vacancy:
+            sources.append(
+                open_data_source("Commercial vacancy filings", vacancy["total"], "latest filing")
+            )
+        for gap in found.unavailable:
+            sources.append(
+                Source(
+                    label=gap["source"],
+                    kind="reference",
+                    detail="Not reachable: " + gap["reason"][:140],
+                )
+            )
+
+        return ToolResult(
+            payload,
+            [{"action": "flyTo",
+              "payload": {"lon": lon, "lat": lat, "zoom": 14.6, "label": resolved}}],
+            sources,
+            f"Fetched live listings, review text and vacancy for {topic} in {resolved}.",
+        )
+
     def rank_sites(category: str, near: str | None = None, limit: int = 6) -> ToolResult:
         candidates = _candidate_frame(root, world, near)
         if candidates.empty:
@@ -471,6 +607,7 @@ def build_tools(root: Path, world, sim, hub) -> dict:
     return {
         "get_area_report": get_area_report,
         "find_opportunity": find_opportunity,
+        "research_demand": research_demand,
         "rank_sites": rank_sites,
         "simulate_event": simulate_event,
         "compare_areas": compare_areas,
