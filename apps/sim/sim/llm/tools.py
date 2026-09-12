@@ -180,10 +180,23 @@ def build_tools(root: Path, world, sim, hub) -> dict:
             )
         )
         sources.append(places_source(world.n_pois, enriched))
+        # Switch on the layers this report actually has numbers for. An answer
+        # quoting complaint counts beside a blank map is a paragraph, not a map
+        # product, and whether that happens should not depend on the model
+        # remembering to ask for it.
+        present = set((report.get("sections") or {}).keys())
+        layers_on = [name for name in ("complaints", "incidents", "permits", "vacancy")
+                     if name in present]
         return ToolResult(
             report,
-            [{"action": "flyTo",
-              "payload": {"lon": lon, "lat": lat, "zoom": 15.2, "label": resolved}}],
+            [
+                {"action": "setLayers", "payload": {"on": layers_on}},
+                {"action": "flyTo",
+                 "payload": {"lon": lon, "lat": lat, "zoom": 15.2, "label": resolved}},
+                {"action": "highlight",
+                 "payload": {"markers": [{"label": resolved.split(",")[0][:22],
+                                          "lon": lon, "lat": lat}], "kind": "pin"}},
+            ],
             sources,
             f"Read everything within {int(radius_metres)} m of {resolved}.",
         )
@@ -570,6 +583,10 @@ def build_tools(root: Path, world, sim, hub) -> dict:
             {"action": "event",
              "payload": {"lon": lon, "lat": lat, "label": resolved,
                          "attendance": int(attendance), "origins": origins}},
+            # the crowd is the whole point, so make sure people are drawn, and
+            # put the clock where the arrivals actually happen
+            {"action": "setToggles", "payload": {"showAgents": True, "showDensity": True}},
+            {"action": "setTime", "payload": {"minute": 4 * 1440 + max(start - 45, 0)}},
         ]
         result.pop("attendeeHomeSample", None)  # drawn, not narrated
         sources = [
@@ -606,9 +623,18 @@ def build_tools(root: Path, world, sim, hub) -> dict:
             markers.append({"label": resolved, "lon": lon, "lat": lat})
             sources.extend(_section_sources(report))
         sources.append(simulation_source(world.n_agents, "Footfall within 150 m of each place"))
+        compare_actions: list[dict] = [
+            {"action": "highlight", "payload": {"markers": markers, "kind": "compare"}},
+            {"action": "setLayers", "payload": {"on": ["complaints", "incidents"]}},
+        ]
+        if markers:
+            compare_actions.append(
+                {"action": "flyTo",
+                 "payload": {"lon": markers[0]["lon"], "lat": markers[0]["lat"], "zoom": 13.4}}
+            )
         return ToolResult(
             {"comparison": rows},
-            [{"action": "highlight", "payload": {"markers": markers, "kind": "compare"}}],
+            compare_actions,
             _dedupe(sources),
             f"Compared {len(rows)} places on footfall, complaints, incidents and vacancy.",
         )

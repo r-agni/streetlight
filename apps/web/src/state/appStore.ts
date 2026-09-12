@@ -189,26 +189,124 @@ export const useApp = create<AppState>((set) => ({
   setAssistantBusy: (assistantBusy) => set({ assistantBusy }),
 }));
 
-/** Questions offered per mode, so the box is never a blank prompt. */
-export const SUGGESTIONS: Record<Mode, string[]> = {
+/** A question worth clicking: a headline, and the text actually sent. */
+export interface Suggestion {
+  label: string;
+  detail: string;
+  prompt: string;
+}
+
+/**
+ * Questions phrased the way the good answers need.
+ *
+ * Short prompts get a clarifying question back, which is correct behaviour but
+ * a poor demonstration. Each of these carries the detail that produced a strong
+ * answer in testing: a budget and a customer, a day and a time, a named place.
+ */
+export const SUGGESTIONS: Record<Mode, Suggestion[]> = {
   explore: [
-    'What is 16th and Mission like right now?',
-    'Compare the Marina with the Tenderloin',
-    'Show me where complaints cluster, on the map',
+    {
+      label: 'What is this corner actually like?',
+      detail: 'Footfall, complaints, incidents and what trades there',
+      prompt:
+        'What is 16th and Mission like right now? Cover modelled footfall through ' +
+        'the day, what residents report to 311, what the police record, and which ' +
+        'businesses are there. Show it on the map with the complaint layer on.',
+    },
+    {
+      label: 'Compare two neighbourhoods',
+      detail: 'The Marina against the Tenderloin, side by side',
+      prompt:
+        'Compare the Marina with the Tenderloin on modelled footfall, 311 ' +
+        'complaints, police incidents and the mix of businesses. Say plainly which ' +
+        'is busier and which has more reported problems, and mark both on the map.',
+    },
+    {
+      label: 'Where do complaints cluster?',
+      detail: 'The worst blocks, and what people are reporting',
+      prompt:
+        'Which parts of San Francisco get the most 311 complaints, and what are ' +
+        'people actually complaining about there? Turn the complaint layer on and ' +
+        'take me to the worst area.',
+    },
   ],
   business: [
-    'Where is there unmet demand for an Indian chai house?',
-    'I want to open a natural wine bar. Where, and why?',
-    'Which areas have the most cafes but the least competition?',
+    {
+      label: 'Where should I sign a lease?',
+      detail: 'A chai house, with budget and customer, down to the address',
+      prompt:
+        'I have a 200 thousand dollar budget, my customers are young professionals ' +
+        'and students, and I am open to any neighbourhood. Where exactly should I ' +
+        'sign a lease for an Indian chai house? Give me real vacant addresses, not ' +
+        'just a neighbourhood, and tell me what would change your mind.',
+    },
+    {
+      label: 'Is this concept already saturated?',
+      detail: 'What trades now, what customers say, where the gap is',
+      prompt:
+        'I am thinking about a natural wine bar in San Francisco. Research what ' +
+        'already trades, what customers say about those places in their reviews, ' +
+        'and what people say online. Then tell me whether the market is saturated ' +
+        'and which two neighbourhoods still have room.',
+    },
+    {
+      label: 'Rank vacant sites for a cafe',
+      detail: 'Real vacancy filings in the Mission, scored',
+      prompt:
+        'Rank the real vacant commercial parcels in the Mission for a cafe. Show ' +
+        'them on the map, and explain what separates the top one from the second.',
+    },
   ],
   planner: [
-    'What is the land use around Dogpatch?',
-    'Which blocks have the most building permits?',
-    'How far can someone walk from Civic Center in 10 minutes?',
+    {
+      label: 'Read a neighbourhood as a planner',
+      detail: 'Complaints, walkability and what is being built',
+      prompt:
+        'I am a planner looking at the Tenderloin. What do residents complain ' +
+        'about most, how walkable is it, and what is being built? Turn on the ' +
+        'complaint and permit layers and show me.',
+    },
+    {
+      label: 'Who can actually reach this?',
+      detail: 'A ten-minute walk measured along real streets',
+      prompt:
+        'How far can someone actually walk from Civic Center in ten minutes, ' +
+        'measured along the street network rather than as a circle? Draw it on ' +
+        'the map and tell me how many people live inside it.',
+    },
+    {
+      label: 'Where is housing being added?',
+      detail: 'Permits filed, and the units they propose',
+      prompt:
+        'Which parts of San Francisco have the most building permits filed in the ' +
+        'last three years, and how many homes do they propose? Turn the permit ' +
+        'layer on and take me to the busiest area.',
+    },
   ],
   events: [
-    'Model a sold-out Warriors game at Chase Center',
-    'What happens to nearby bars during an Oracle Park game?',
-    'Which blocks get crowded before a 7pm concert?',
+    {
+      label: 'Prepare for a sold-out game',
+      detail: 'Transit surge, crowding and the worst blocks',
+      prompt:
+        'There is a sold-out Warriors game at Chase Center on Friday at 7pm. I run ' +
+        'city operations. What should I prepare for, which blocks get worst, and ' +
+        'how do people arrive and leave? Show the crowd on the map.',
+    },
+    {
+      label: 'What does an event do to local trade?',
+      detail: 'Which businesses absorb the crowd, and how many',
+      prompt:
+        'During a Giants game at Oracle Park, which nearby bars, restaurants and ' +
+        'cafes see the most extra people, and roughly how many each? Put the venue ' +
+        'and the crowd on the map.',
+    },
+    {
+      label: 'Compare two venues on the same night',
+      detail: 'Chase Center against Oracle Park',
+      prompt:
+        'Compare a 18,000 person event at Chase Center with a 41,000 person event ' +
+        'at Oracle Park, both at 7pm. Which one puts more pressure on transit and ' +
+        'on the surrounding blocks, and why?',
+    },
   ],
 };

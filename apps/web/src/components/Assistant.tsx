@@ -6,7 +6,7 @@
  * after it. Every number in an answer comes from a tool, not from the model.
  */
 import { useEffect, useRef, useState } from 'react';
-import { CornerDownLeft, Loader2, Sparkles } from 'lucide-react';
+import { ArrowRight, CornerDownLeft, Loader2, Sparkles } from 'lucide-react';
 
 import { connection } from '../sim/connection';
 import { SUGGESTIONS, useApp } from '../state/appStore';
@@ -56,12 +56,24 @@ export function Assistant() {
             </p>
             {SUGGESTIONS[mode].map((s) => (
               <button
-                key={s}
+                key={s.label}
                 type="button"
-                onClick={() => ask(s)}
-                className="block w-full rounded-[10px] border border-[var(--color-hairline)] bg-white/70 px-3 py-2 text-left text-[12px] leading-snug transition-colors hover:border-[var(--color-ink-blue)] hover:text-[var(--color-ink-blue)]"
+                onClick={() => ask(s.prompt)}
+                title={s.prompt}
+                className="group block w-full rounded-[10px] border border-[var(--color-hairline)] bg-white/70 px-3 py-2 text-left transition-colors hover:border-[var(--color-ink-blue)]"
               >
-                {s}
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-[12px] font-medium leading-snug group-hover:text-[var(--color-ink-blue)]">
+                    {s.label}
+                  </span>
+                  <ArrowRight
+                    size={11}
+                    className="ml-auto shrink-0 translate-x-0 text-[var(--color-ink-soft)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--color-ink-blue)]"
+                  />
+                </div>
+                <div className="mt-0.5 text-[10.5px] leading-snug text-[var(--color-ink-soft)]">
+                  {s.detail}
+                </div>
               </button>
             ))}
           </div>

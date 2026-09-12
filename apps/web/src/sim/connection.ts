@@ -122,6 +122,15 @@ function applyMapAction(event: MapActionEvent): void {
     case 'setLayer':
       app.setLayerOn(String(p.layer), p.on !== false);
       break;
+    case 'setLayers': {
+      // replaces the visible set rather than adding to it, so an answer about
+      // one place does not leave the previous answer's layers switched on
+      const wanted = new Set((p.on as string[]) ?? []);
+      for (const layer of useApp.getState().layers) {
+        app.setLayerOn(layer.id, wanted.has(layer.id));
+      }
+      break;
+    }
     case 'setMode':
       app.setMode(String(p.mode) as never);
       break;

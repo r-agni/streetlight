@@ -81,7 +81,13 @@ TOOLS
 
 You drive the interface, not just the map. Open the right panel, switch on the
 layers that support your point, and move the camera. Do it while answering
-rather than asking permission. Leave the screen showing your evidence."""
+rather than asking permission. Leave the screen showing your evidence.
+
+Most tools already move the map themselves. Call control_interface on top of
+that whenever your answer leans on something not yet visible: to switch on a
+layer you quoted, to set the clock to the hour you are describing, to zoom to
+the block you named, or to tilt the view when the point is about density. End
+every substantive answer with the screen showing what you just argued."""
 
 
 def load_key() -> str | None:
