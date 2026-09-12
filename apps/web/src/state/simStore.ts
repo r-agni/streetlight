@@ -17,6 +17,17 @@ export interface GridMeta {
   shape: [number, number];
 }
 
+/** What real moment the simulation minute currently stands for. */
+export interface ClockState {
+  iso: string;
+  minute: number;
+  horizon: 'past' | 'live' | 'future';
+  dayName: string;
+  label: string;
+  daysFromNow: number;
+  describe?: string;
+}
+
 export interface SimState {
   connected: boolean;
   dataMode: string;
@@ -27,6 +38,8 @@ export interface SimState {
   segments: string[];
 
   minute: number;
+  clock: ClockState | null;
+  setClock: (clock: ClockState) => void;
   playing: boolean;
   speed: number;
   moving: number;
@@ -60,6 +73,8 @@ export const useSim = create<SimState>((set) => ({
   segments: [],
 
   minute: 500,
+  clock: null,
+  setClock: (clock) => set({ clock, minute: clock.minute }),
   playing: true,
   speed: 20,
   moving: 0,

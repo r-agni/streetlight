@@ -18,6 +18,7 @@ import { PosterCard } from './components/PosterCard';
 import { Controls } from './components/Controls';
 import { Assistant } from './components/Assistant';
 import { LayerPanel } from './components/LayerPanel';
+import { TimeTravel } from './components/TimeTravel';
 import { AreaPanel } from './components/AreaReport';
 import { BusinessPanel } from './components/panels/BusinessPanel';
 import { EventsPanel } from './components/panels/EventsPanel';
@@ -99,6 +100,7 @@ export default function App() {
           {leftOpen && (
             <div className="pointer-events-auto flex w-[340px] min-h-0 flex-col gap-2 overflow-y-auto pr-0.5">
               <PosterCard />
+              <TimeTravel />
               <ModeTabs />
               {mode === 'explore' && (
                 <>

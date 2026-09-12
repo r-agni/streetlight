@@ -38,8 +38,16 @@ export function startConnection(): void {
           speed: msg.speed,
           grid: (msg as unknown as { grid: SimGrid }).grid ?? null,
         });
+        {
+          const hello = msg as unknown as {
+            clock?: import('../state/simStore').ClockState;
+          };
+          if (hello.clock) store.setClock(hello.clock);
+        }
         break;
-      case 'stats':
+      case 'stats': {
+        const withClock = msg as unknown as { clock?: import('../state/simStore').ClockState };
+        if (withClock.clock) store.setClock(withClock.clock);
         store.setStats({
           minute: msg.minute,
           moving: msg.moving,
@@ -48,6 +56,7 @@ export function startConnection(): void {
           ticksPerSecond: msg.ticksPerSecond,
         });
         break;
+      }
       case 'assistantDelta': {
         const app = useApp.getState();
         if (msg.text) app.appendToLast(msg.text);
@@ -174,9 +183,12 @@ function applyMapAction(event: MapActionEvent): void {
       sim.set(next as never);
       break;
     }
-    case 'setTime':
-      useSim.getState().set({ minute: Number(p.minute) });
+    case 'setTime': {
+      const sim = useSim.getState();
+      if (p.clock) sim.setClock(p.clock as import('../state/simStore').ClockState);
+      else sim.set({ minute: Number(p.minute) });
       break;
+    }
     case 'clear':
       app.setMarkers([]);
       app.setCatchmentHull(null);

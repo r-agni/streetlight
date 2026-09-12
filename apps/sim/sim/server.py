@@ -21,6 +21,7 @@ from fastapi.responses import ORJSONResponse
 
 from .analysis import events as events_mod
 from .analysis import insight, layers
+from .engine import calendar
 from .engine.sim import MINUTES_PER_DAY, Simulation
 from .engine.world import load_world
 from .llm.assistant import Assistant
@@ -64,14 +65,19 @@ class Hub:
         self._tps = 0.0
         self.assistant: Assistant | None = None
         self.tools: dict = {}
+        #: the real moment the clock is currently standing in for
+        self.anchor = calendar.live()
 
     def load(self) -> None:
         self.cfg = yaml.safe_load((ROOT / "config.yaml").read_text())
         self.world = load_world(ROOT)
         self.sim = Simulation(self.world, seed=int(self.cfg.get("seed", 42)))
         self.frame_hz = float(self.cfg["sim"].get("frame_hz", 6))
-        # start mid-morning so the first thing anyone sees is a busy city
-        self.sim.seek(8 * 60 + 20)
+        # Start at the actual current time in San Francisco. Opening the app
+        # on a Saturday evening should show a Saturday evening, not an
+        # arbitrary weekday the session happened to begin on.
+        self.anchor = calendar.live()
+        self.sim.seek(self.anchor.minute)
         self.tools = build_tools(ROOT, self.world, self.sim, self)
         self.assistant = _make_assistant(self.tools)
         print(f"assistant: {type(self.assistant).__name__} "
@@ -133,6 +139,7 @@ class Hub:
                         "minute": sim.minute_of_week,
                         "tick": sim.tick_count,
                         "ticksPerSecond": round(self._tps, 1),
+                        "clock": self.clock_state(),
                         "topCells": [
                             {"cell": str(i), "count": c} for i, c in sim.top_cells(8)
                         ],
@@ -160,6 +167,40 @@ class Hub:
     def broadcast_json(self, obj: dict) -> None:
         self._push(obj)
 
+    def clock_state(self) -> dict:
+        """What real moment the simulation minute currently stands for.
+
+        The anchor holds the date; the running clock supplies the time of day.
+        Recombining them each tick keeps the label honest while the simulation
+        advances, without the engine having to know about dates at all.
+        """
+        from datetime import timedelta
+
+        minute = self.sim.minute_of_week
+        anchor = self.anchor
+        # keep the anchor's date, take the day and time from the live clock
+        day_shift = (minute // MINUTES_PER_DAY) - (anchor.minute // MINUTES_PER_DAY)
+        moment = (anchor.moment + timedelta(days=day_shift)).replace(
+            hour=(minute % MINUTES_PER_DAY) // 60,
+            minute=minute % 60,
+            second=0,
+            microsecond=0,
+        )
+        instant = calendar.at(moment)
+        # The playhead runs faster than wall time, so simply classifying the
+        # current minute would relabel the view "projecting" within seconds of
+        # pressing play. Playing forward from now is not time travel: the
+        # horizon stays whatever the viewer actually asked for.
+        instant = calendar.Instant(
+            moment=instant.moment, minute=instant.minute, horizon=anchor.horizon
+        )
+        return {**instant.to_dict(), "describe": calendar.describe(instant)}
+
+    def set_anchor(self, instant) -> None:
+        """Move to a real date and time, past or future."""
+        self.anchor = instant
+        self.sim.seek(instant.minute)
+
     def hello(self) -> dict:
         sim, world = self.sim, self.world
         cats = world.categories
@@ -179,6 +220,7 @@ class Hub:
                 {"id": i, "label": label} for i, label in enumerate(ARCHETYPE_LABELS)
             ],
             "dataMode": world.manifest.get("mode", "unknown"),
+            "clock": self.clock_state(),
             "grid": {
                 "origin": list(world.grid_origin),
                 "step": list(world.grid_step),
@@ -397,6 +439,27 @@ def event_sim(venue: str, attendance: int = 15000, start_hour: int = 19) -> dict
         start_minute=start_hour * 60, end_minute=start_hour * 60 + 180,
     )
     return events_mod.simulate(hub.world, hub.sim, spec)
+
+
+@app.get("/api/clock")
+def clock() -> dict:
+    """What moment the viewer is looking at, and what that means."""
+    return hub.clock_state()
+
+
+@app.post("/api/clock")
+def set_clock(iso: str | None = None, day_offset: int | None = None,
+              weekday: str | None = None, hour: int | None = None,
+              minute: int = 0) -> dict:
+    """Move the clock to a real date and time."""
+    if iso is None and day_offset is None and weekday is None and hour is None:
+        hub.set_anchor(calendar.live())
+    else:
+        hub.set_anchor(
+            calendar.resolve(iso=iso, day_offset=day_offset, weekday=weekday,
+                             hour=hour, minute=minute)
+        )
+    return hub.clock_state()
 
 
 @app.websocket("/ws")

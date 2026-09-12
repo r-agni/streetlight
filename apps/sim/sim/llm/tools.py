@@ -22,6 +22,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from ..engine import calendar
 from ..analysis import events as events_mod
 from ..analysis import insight, layers, opportunity, research, websearch
 from .contracts import (
@@ -518,6 +519,52 @@ def build_tools(root: Path, world, sim, hub) -> dict:
             f"Searched public discussion and press for {topic} in {place}.",
         )
 
+    def set_time_window(iso: str | None = None, day_offset: int | None = None,
+                        weekday: str | None = None, hour: int | None = None,
+                        minute: int = 0) -> ToolResult:
+        """Move the view to a real date and time, in the past or the future."""
+        if iso is None and day_offset is None and weekday is None and hour is None:
+            instant = calendar.live()
+        else:
+            instant = calendar.resolve(
+                iso=iso, day_offset=day_offset, weekday=weekday, hour=hour, minute=minute
+            )
+        hub.set_anchor(instant)
+        state = hub.clock_state()
+
+        kind = {
+            "past": "derived",
+            "live": "modelled",
+            "future": "derived",
+        }[instant.horizon]
+        return ToolResult(
+            {
+                **state,
+                "meaning": calendar.describe(instant),
+                "caution": (
+                    "Replay of the modelled typical week against a past date. The "
+                    "simulation holds no record of that specific day."
+                    if instant.horizon == "past"
+                    else (
+                        "Projection of the modelled typical week onto a future date. "
+                        "Not a forecast of that day: weather, closures and one-off "
+                        "events are not included unless you add them."
+                        if instant.horizon == "future"
+                        else "The current time in San Francisco."
+                    )
+                ),
+            },
+            [{"action": "setTime", "payload": {"minute": instant.minute, "clock": state}}],
+            [
+                Source(
+                    label="Simulation clock",
+                    kind=kind,
+                    detail=calendar.describe(instant)[:150],
+                )
+            ],
+            f"Moved the view to {instant.label} ({instant.horizon}).",
+        )
+
     def rank_sites(category: str, near: str | None = None, limit: int = 6) -> ToolResult:
         candidates = _candidate_frame(root, world, near)
         if candidates.empty:
@@ -758,6 +805,7 @@ def build_tools(root: Path, world, sim, hub) -> dict:
         "compare_areas": compare_areas,
         "show_on_map": show_on_map,
         "set_time": set_time,
+        "set_time_window": set_time_window,
         "control_interface": control_interface,
     }
 

@@ -18,8 +18,8 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 export function PosterCard() {
-  const { minute, nAgents, moving, dwelling, dataMode, connected } = useSim();
-  const clock = clockParts(minute);
+  const { minute, clock, nAgents, moving, dwelling, dataMode, connected } = useSim();
+  const parts = clockParts(minute);
   const people = Math.round((nAgents || 0) * (830_000 / Math.max(nAgents, 1)));
 
   return (
@@ -37,7 +37,16 @@ export function PosterCard() {
       </p>
 
       <div className="mt-6 grid grid-cols-2 gap-y-4">
-        <Stat label="Day and time" value={`${clock.dayName.slice(0, 3)} ${clock.label}`} />
+        <Stat
+          label={
+            clock?.horizon === 'past'
+              ? 'Looking back at'
+              : clock?.horizon === 'future'
+                ? 'Projecting'
+                : 'Now in San Francisco'
+          }
+          value={clock?.label ?? `${parts.dayName.slice(0, 3)} ${parts.label}`}
+        />
         <Stat label="People modelled" value={people.toLocaleString()} />
         <Stat label="On the move" value={moving.toLocaleString()} />
         <Stat label="At a place" value={dwelling.toLocaleString()} />

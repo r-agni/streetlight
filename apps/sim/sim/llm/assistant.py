@@ -77,6 +77,11 @@ TOOLS
 - compare_areas: two to four places side by side.
 - control_interface: open a panel, switch data layers on or off, move, zoom,
   rotate or tilt the camera, and start, stop or speed up the clock.
+- set_time_window: move the view to a real date and time, past or future. The
+  clock runs on the actual current time in San Francisco. Looking back replays
+  the modelled typical week against that date, and looking forward projects it;
+  say which you are doing, and never present either as a record or a forecast
+  of that particular day.
 - show_on_map, set_time: smaller versions of the same.
 
 You drive the interface, not just the map. Open the right panel, switch on the
@@ -216,6 +221,29 @@ def tool_definitions() -> list[dict]:
                     "include_press": {"type": "boolean", "default": True},
                 },
                 "required": ["topic"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "set_time_window",
+            "description": (
+                "Move the view to a real date and time. Accepts an ISO date, an "
+                "offset in days, or a weekday name, each with an optional hour. "
+                "Call with no arguments to return to now. Use it for questions "
+                "about a past day, a coming weekend, or a specific evening. Past "
+                "dates replay the modelled typical week; future dates project it, "
+                "and neither knows anything specific about that day unless an "
+                "event has been added."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "iso": {"type": "string", "description": "A date like 2026-09-19, optionally with a time."},
+                    "day_offset": {"type": "integer", "description": "Days from today; negative for the past."},
+                    "weekday": {"type": "string", "description": "A weekday name, or today, tomorrow, yesterday."},
+                    "hour": {"type": "integer"},
+                    "minute": {"type": "integer", "default": 0},
+                },
                 "additionalProperties": False,
             },
         },
