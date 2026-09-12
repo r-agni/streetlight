@@ -1,0 +1,25 @@
+seed: 42
+city: "San Francisco"
+# west, south, east, north  (main peninsula; excludes Farallones / Treasure Island)
+bbox: [-122.5170, 37.7080, -122.3570, 37.8340]
+core_bbox: [-122.4500, 37.7480, -122.3820, 37.8090]
+
+sim:
+  n_agents: 20000
+  tick_minutes: 1
+  frame_hz: 6
+  keyframe_every_min: 10
+  speeds_m_per_min: # metres per simulated minute
+    walk: 78
+    bike: 230
+    transit: 430
+    car: 330
+
+routing:
+  max_route_m: 9000
+  chunk_origins: 150
+
+llm:
+  n_archetypes: 240
+  model: "claude-opus-5"
+  batch: true

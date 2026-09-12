@@ -1,0 +1,20 @@
+{
+  "name": "sf-city-sim",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/web",
+    "packages/protocol"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @sfcs/web",
+    "build": "npm run build -w @sfcs/protocol && npm run build -w @sfcs/web",
+    "sim": "cd apps/sim && uv run uvicorn sim.server:app --reload --port 8000",
+    "tiles": "powershell -ExecutionPolicy Bypass -File scripts/make_pmtiles.ps1",
+    "sprites": "node scripts/make_sprites.mjs"
+  },
+  "devDependencies": {
+    "@napi-rs/canvas": "^1.0.9",
+    "playwright": "^1.63.0"
+  }
+}

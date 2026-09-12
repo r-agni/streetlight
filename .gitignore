@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.local
+data/raw/
+data/processed/
+data/runs/
+data/llm/batches/
+apps/web/public/tiles/*.pmtiles
+apps/web/public/sprites/*.png
+.vite/
+.DS_Store

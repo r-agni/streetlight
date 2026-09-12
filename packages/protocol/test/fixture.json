@@ -1,0 +1,64 @@
+{
+  "agents": {
+    "b64": "RlMCAAcAAADoAwAAAwAAALzW9MJ/GRdCDdH0ws8mF0IwyvTCmC4XQgBAwAIBAAASHgAAAA==",
+    "tick": 7,
+    "minute": 1000,
+    "lon": [
+      -122.41940307617188,
+      -122.4083023071289,
+      -122.3948974609375
+    ],
+    "lat": [
+      37.774898529052734,
+      37.787899017333984,
+      37.795501708984375
+    ],
+    "heading": [
+      0,
+      64,
+      192
+    ],
+    "state": [
+      2,
+      1,
+      0
+    ],
+    "segment": [
+      0,
+      18,
+      30
+    ],
+    "persona": [
+      0,
+      2,
+      6
+    ],
+    "mode": [
+      0,
+      2,
+      3
+    ]
+  },
+  "agentsWithIds": {
+    "b64": "RlMCAQcAAADoAwAAAwAAAAoAAAALAAAADAAAALzW9MJ/GRdCDdH0ws8mF0IwyvTCmC4XQgBAwAIBAAASHgAAAA==",
+    "ids": [
+      10,
+      11,
+      12
+    ]
+  },
+  "grid": {
+    "b64": "REcCAAAAAADoAwAAAwAAAAUAAAAJAAAADgAAAAMAeAAHAAAA",
+    "minute": 1000,
+    "indices": [
+      5,
+      9,
+      14
+    ],
+    "values": [
+      3,
+      120,
+      7
+    ]
+  }
+}

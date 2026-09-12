@@ -1,0 +1,142 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens.
+ *
+ * The identity is a printed-poster one: a flat warm-grey ground, one electric
+ * ultramarine that carries every piece of live data, and white. There are no
+ * gradients and no coloured shadows anywhere in the product.
+ */
+@theme {
+  /* the one accent. everything that moves or matters is this colour */
+  --color-ink-blue: #2323e5;
+  --color-ink-blue-deep: #1414b8;
+  --color-ink-blue-soft: #6f6ff2;
+  --color-ink-blue-mist: #c9c9fb;
+
+  /* paper */
+  --color-ground: #dcdbd7;
+  --color-paper: #eceae6;
+  --color-paper-bright: #f6f5f2;
+  --color-ink: #0b0b12;
+  --color-ink-soft: #5c5c66;
+  --color-hairline: #c4c2bd;
+
+  /* map */
+  --color-map-ground: #dcdbd7;
+  --color-map-water: #c6c8d0;
+  --color-map-building: #d1cfca;
+  --color-map-road: #f2f1ee;
+  --color-map-road-major: #fbfaf8;
+  --color-map-label: #6b6b73;
+
+  /* type */
+  --font-display: 'Archivo', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-sans: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* the poster's card radius, proportionally scaled down for screen */
+  --radius-card: 18px;
+  --radius-chip: 8px;
+}
+
+:root {
+  color-scheme: light;
+  /* White at 55% over #2323E5 measures 3.47:1, which fails AA for body text.
+     Body-size secondary text uses 0.78; the 0.55 tone is kept only for the
+     large display line, where AA allows 3:1. */
+  --muted-on-blue: rgba(255, 255, 255, 0.78);
+  --muted-display-on-blue: rgba(255, 255, 255, 0.58);
+  --faint-on-blue: rgba(255, 255, 255, 0.72);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+
+/* every figure in the product is tabular so columns of numbers line up */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
+}
+
+/*
+ * The poster's card: a solid electric-blue rectangle with generous padding,
+ * white primary text and a 55%-white secondary. Used for every overlay panel.
+ */
+.card-blue {
+  background: var(--color-ink-blue);
+  color: #fff;
+  border-radius: var(--radius-card);
+}
+
+.card-paper {
+  background: var(--color-paper-bright);
+  color: var(--color-ink);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+}
+
+.muted {
+  color: var(--muted-on-blue);
+}
+
+/* only for text at or above ~24px, where the lower contrast ratio is allowed */
+.muted-display {
+  color: var(--muted-display-on-blue);
+}
+
+.faint {
+  color: var(--faint-on-blue);
+}
+
+/* Labels sit above their value, small, wide-tracked, uppercase. */
+.eyebrow {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.maplibregl-ctrl-attrib {
+  font-size: 9px;
+  background: rgba(255, 255, 255, 0.7) !important;
+}
+
+.maplibregl-ctrl-attrib a {
+  color: var(--color-ink-soft);
+}
+
+/* deck.gl and maplibre both want the canvas to fill its parent */
+.map-root,
+.map-root canvas {
+  outline: none;
+}
+
+@keyframes riso-drift {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 60px 60px;
+  }
+}
