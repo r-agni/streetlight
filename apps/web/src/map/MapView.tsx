@@ -1,66 +1,62 @@
 /**
  * The map.
  *
- * MapLibre draws the paper basemap; deck.gl draws everything that moves. The
+ * MapLibre draws the paper basemap; deck.gl draws everything else. The
  * animation loop never goes through React: it blends the two newest position
- * snapshots into a reusable buffer and hands that buffer to the GPU as a binary
- * attribute, so per-agent cost stays off the main thread.
+ * snapshots into reusable buffers and hands those to the GPU as binary
+ * attributes, so per-agent cost stays off the main thread.
  *
- * Density is drawn as a halftone dot screen rather than a smooth heat blur —
- * one dot per grid cell, area proportional to the people standing in it.
+ * Layer order is deliberate. Density sits underneath as a halftone screen,
+ * then city data, then places, then people, then anything a panel or the
+ * assistant asked to draw. Whatever is alive stays on top.
  */
 import { useEffect, useRef } from 'react';
 import { Map as MapLibreMap, NavigationControl } from 'maplibre-gl';
 import { MapboxOverlay } from '@deck.gl/mapbox';
 import type { Layer } from '@deck.gl/core';
-import { IconLayer, ScatterplotLayer } from '@deck.gl/layers';
+import { IconLayer, PathLayer, ScatterplotLayer, TextLayer } from '@deck.gl/layers';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { loadBasemapStyle } from './basemapStyle';
 import { connection, gridCellsToPoints, interpolator, startConnection } from '../sim/connection';
 import { useSim } from '../state/simStore';
+import { useApp } from '../state/appStore';
+import { api } from '../lib/api';
+import { AGENT_STATE_COLOUR, categoryColour, INK, rgba } from '../lib/palette';
 import {
   collectSprites,
   iconNameFor,
+  isVehicle,
   loadAtlas,
   makeSpriteBuffer,
   SPRITE_ZOOM,
+  vehicleAngle,
   type SpriteAtlas,
 } from './sprites';
 
-/** Agent colours, indexed by the interpolator's kind byte. */
-const AGENT_COLOURS: [number, number, number, number][] = [
-  [26, 26, 224, 255], // travelling: the only fully saturated thing on screen
-  [88, 88, 236, 150], // dwelling
-  [138, 138, 226, 78], // at home: dim, but still shows where people live
-];
+const LAYER_INK: Record<string, string> = {
+  complaints: INK.complaints,
+  incidents: INK.incidents,
+  vacancy: INK.vacancy,
+  permits: INK.permits,
+};
 
 /** Cell side is roughly 100 m, so this keeps neighbouring dots from merging. */
 const MAX_DOT_METRES = 52;
 
-/**
- * Density and individuals trade places as you zoom.
- *
- * Far out, the halftone screen is the subject and agents are texture. Close in,
- * the screen would balloon into soft overlapping blobs, so it fades and the
- * individual people take over.
- */
+/** Density and individuals trade places as the viewer zooms. */
 const DENSITY_FADE_START = 13.0;
 const DENSITY_FADE_END = 14.8;
 
+const INITIAL_VIEW = { center: [-122.4183, 37.7775] as [number, number], zoom: 12.4 };
+
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
-/** Agent dot radius in pixels, growing as the viewer zooms in. */
 function agentRadiusForZoom(zoom: number): number {
   if (zoom < 12) return 1.15;
   if (zoom > 16) return 3.6;
   return 1.15 + ((zoom - 12) / 4) * 2.45;
 }
-
-const INITIAL_VIEW = {
-  center: [-122.4183, 37.7775] as [number, number],
-  zoom: 12.4,
-};
 
 export function MapView() {
   const host = useRef<HTMLDivElement>(null);
@@ -81,12 +77,16 @@ export function MapView() {
     let gridCount = 0;
     let gridStamp = -1;
 
-    // sprite state
+    // sprites
     let atlas: SpriteAtlas | null = null;
     const spriteIndices = makeSpriteBuffer();
     let spriteData: { i: number }[] = [];
 
-    // frame telemetry
+    // places, fetched once
+    let placeCount = 0;
+    let placeColours = new Uint8Array(0);
+    let placePositions: Float32Array<ArrayBuffer> = new Float32Array(0);
+
     let frames = 0;
     let fpsWindow = performance.now();
     let sampleAge = 0;
@@ -109,58 +109,88 @@ export function MapView() {
       mapRef.current = map;
       map.addControl(new NavigationControl({ showCompass: false }), 'bottom-right');
 
-      // camera hook used by the screenshot harness and, later, by the assistant
-      // when it wants to point the viewer at something it just computed
+      // camera hook used by panels, the assistant and the screenshot harness
       (window as unknown as Record<string, unknown>).__setView = (
         center: [number, number],
         zoom: number,
-      ) => map.jumpTo({ center, zoom });
+      ) => map.flyTo({ center, zoom, duration: 900 });
 
       overlay = new MapboxOverlay({ interleaved: false, layers: [] });
       map.addControl(overlay);
 
-      // the container is often still collapsing into place when the map is
-      // constructed, so take its final size once layout settles
+      // maplibre-gl.css forces position:relative on the container, so the size
+      // has to be taken once layout settles rather than assumed from insets
       const fit = () => map.resize();
       map.once('load', fit);
       const observer = new ResizeObserver(fit);
-      observer.observe(host.current!);
+      observer.observe(host.current);
       cleanups.push(() => observer.disconnect());
+
+      // clicking anywhere asks the service what that block is like
+      map.on('click', async (e) => {
+        const { lng, lat } = e.lngLat;
+        useApp.getState().setReportLoading(true);
+        useApp.getState().setReport(null, [lng, lat]);
+        try {
+          const report = await api.area(lng, lat, 300);
+          useApp.getState().setReport(report, [lng, lat]);
+        } catch {
+          useApp.getState().setReport(null, [lng, lat]);
+        }
+      });
+
+      api
+        .pois(40000)
+        .then((p) => {
+          placeCount = p.lon.length;
+          placePositions = new Float32Array(placeCount * 2);
+          placeColours = new Uint8Array(placeCount * 4);
+          for (let i = 0; i < placeCount; i++) {
+            placePositions[i * 2] = p.lon[i];
+            placePositions[i * 2 + 1] = p.lat[i];
+            const [r, g, b] = rgba(categoryColour(p.categories[p.cat[i]] ?? ''));
+            placeColours[i * 4] = r;
+            placeColours[i * 4 + 1] = g;
+            placeColours[i * 4 + 2] = b;
+            placeColours[i * 4 + 3] = 190;
+          }
+        })
+        .catch(() => undefined);
 
       const tick = () => {
         if (disposed) return;
         raf = requestAnimationFrame(tick);
 
         const now = performance.now();
-        const state = useSim.getState();
+        const sim = useSim.getState();
+        const app = useApp.getState();
         const zoom = map.getZoom();
-        const densityOpacity = clamp01(
-          (DENSITY_FADE_END - zoom) / (DENSITY_FADE_END - DENSITY_FADE_START),
-        );
-        const agentRadius = agentRadiusForZoom(zoom);
         const sample = interpolator.sample(connection.prev, connection.next, now);
         sampleAge = sample?.age ?? sampleAge;
 
         frames++;
         if (now - fpsWindow >= 500) {
-          state.setPerf(Math.round((frames * 1000) / (now - fpsWindow)), Math.round(sampleAge));
+          sim.setPerf(Math.round((frames * 1000) / (now - fpsWindow)), Math.round(sampleAge));
           frames = 0;
           fpsWindow = now;
         }
 
+        const densityOpacity = clamp01(
+          (DENSITY_FADE_END - zoom) / (DENSITY_FADE_END - DENSITY_FADE_START),
+        );
         const layers: Layer[] = [];
 
-        // ---- density: a halftone dot screen ------------------------------
-        if (state.showDensity && densityOpacity > 0.01 && connection.grid && state.grid) {
+        // ---- density as a halftone screen --------------------------------
+        if (sim.showDensity && densityOpacity > 0.01 && connection.grid && sim.grid) {
           if (connection.gridAt !== gridStamp) {
             gridStamp = connection.gridAt;
             const { indices, values } = connection.grid;
-            gridPoints = gridCellsToPoints(indices, state.grid) as Float32Array<ArrayBuffer>;
+            gridPoints = gridCellsToPoints(indices, sim.grid) as Float32Array<ArrayBuffer>;
             gridCount = values.length;
             if (gridRadii.length !== gridCount) gridRadii = new Float32Array(gridCount);
             let max = 1;
             for (let i = 0; i < gridCount; i++) if (values[i] > max) max = values[i];
-            // area, not radius, carries the count, so the dot reads as a quantity
+            // area, not radius, carries the count, so a dot reads as a quantity
             for (let i = 0; i < gridCount; i++) {
               gridRadii[i] = Math.sqrt(values[i] / max) * MAX_DOT_METRES;
             }
@@ -177,10 +207,9 @@ export function MapView() {
                   },
                 },
                 radiusUnits: 'meters',
-                radiusMinPixels: 0.6,
-                // capped so the screen stays a screen instead of becoming blobs
+                radiusMinPixels: 0.5,
                 radiusMaxPixels: 9,
-                getFillColor: [35, 35, 229, 105],
+                getFillColor: rgba(INK.people, 105),
                 opacity: densityOpacity,
                 stroked: false,
                 pickable: false,
@@ -190,16 +219,58 @@ export function MapView() {
           }
         }
 
+        // ---- city data layers --------------------------------------------
+        for (const id of app.activeLayers) {
+          const data = app.layerData[id];
+          if (!data?.lon?.length) continue;
+          layers.push(
+            new ScatterplotLayer({
+              id: `layer-${id}`,
+              data: data.lon.map((lon, i) => [lon, data.lat[i]] as [number, number]),
+              getPosition: (d: [number, number]) => d,
+              getRadius: 26,
+              radiusUnits: 'meters',
+              radiusMinPixels: 1.6,
+              radiusMaxPixels: 7,
+              getFillColor: rgba(LAYER_INK[id] ?? INK.people, 150),
+              stroked: false,
+              pickable: false,
+            }),
+          );
+        }
+
+        // ---- places, coloured by what they are ---------------------------
+        if (app.showPlaces && placeCount > 0 && zoom >= 13.2) {
+          layers.push(
+            new ScatterplotLayer({
+              id: 'places',
+              data: {
+                length: placeCount,
+                attributes: {
+                  getPosition: { value: placePositions, size: 2 },
+                  getFillColor: { value: placeColours, size: 4, normalized: true },
+                },
+              },
+              getRadius: 1,
+              radiusUnits: 'pixels',
+              radiusMinPixels: zoom < 15 ? 1.4 : 2.6,
+              radiusMaxPixels: 5,
+              opacity: clamp01((zoom - 13.2) / 1.2),
+              stroked: false,
+              pickable: false,
+            }),
+          );
+        }
+
         // ---- agents as dots ----------------------------------------------
-        // dots and figures cross-fade rather than switching, so there is no pop
         const spritesActive = atlas !== null && zoom >= SPRITE_ZOOM;
         const dotOpacity = spritesActive ? clamp01((SPRITE_ZOOM + 1.1 - zoom) / 1.1) : 1;
 
-        if (state.showAgents && dotOpacity > 0.01 && sample && sample.count > 0) {
+        if (sim.showAgents && dotOpacity > 0.01 && sample && sample.count > 0) {
           if (colours.length !== sample.count * 4) colours = new Uint8Array(sample.count * 4);
           const kind = sample.kind;
           for (let i = 0; i < sample.count; i++) {
-            const c = AGENT_COLOURS[kind[i]];
+            const c = AGENT_STATE_COLOUR[kind[i]];
             const o = i * 4;
             colours[o] = c[0];
             colours[o + 1] = c[1];
@@ -216,7 +287,7 @@ export function MapView() {
                   getFillColor: { value: colours, size: 4, normalized: true },
                 },
               },
-              getRadius: agentRadius,
+              getRadius: agentRadiusForZoom(zoom),
               radiusUnits: 'pixels',
               radiusMinPixels: 1,
               radiusMaxPixels: 6,
@@ -232,7 +303,7 @@ export function MapView() {
         }
 
         // ---- agents as walking figures -----------------------------------
-        if (state.showAgents && spritesActive && sample && sample.count > 0) {
+        if (sim.showAgents && spritesActive && sample && sample.count > 0) {
           const b = map.getBounds();
           const padLon = (b.getEast() - b.getWest()) * 0.08;
           const padLat = (b.getNorth() - b.getSouth()) * 0.08;
@@ -246,14 +317,13 @@ export function MapView() {
             ],
             spriteIndices,
           );
-
           if (spriteData.length !== found) {
             spriteData = Array.from({ length: found }, () => ({ i: 0 }));
           }
           for (let k = 0; k < found; k++) spriteData[k].i = spriteIndices[k];
 
           const seconds = now / 1000;
-          const figureSize = zoom < 16 ? 17 : zoom < 17.5 ? 26 : 36;
+          const figureSize = zoom < 16 ? 22 : zoom < 17.5 ? 34 : 46;
           const positions = sample.positions;
           const segment = sample.segment;
           const kinds = sample.kind;
@@ -268,19 +338,102 @@ export function MapView() {
               getPosition: (d: { i: number }) => [positions[d.i * 2], positions[d.i * 2 + 1]],
               getIcon: (d: { i: number }) =>
                 iconNameFor(atlas!, segment[d.i], kinds[d.i], angles[d.i], d.i, seconds),
+              // only vehicles rotate; people change sprite instead, which is
+              // what keeps a pixel figure from shearing
+              getAngle: (d: { i: number }) =>
+                isVehicle(segment[d.i]) ? vehicleAngle(angles[d.i]) : 0,
               getSize: figureSize,
               sizeUnits: 'pixels',
-              getColor: (d: { i: number }) =>
-                kinds[d.i] === 0 ? [26, 26, 224, 255] : [90, 90, 216, 190],
               billboard: false,
-              alphaCutoff: 0.04,
+              alphaCutoff: 0.05,
               opacity: clamp01((zoom - SPRITE_ZOOM) / 0.8),
               pickable: false,
               updateTriggers: {
                 getPosition: interpolator.revision,
                 getIcon: Math.floor(seconds * 8),
-                getColor: interpolator.revision,
+                getAngle: interpolator.revision,
               },
+            }),
+          );
+        }
+
+        // ---- drawn by a panel or by the assistant -------------------------
+        if (app.catchmentHull?.length) {
+          layers.push(
+            new PathLayer({
+              id: 'catchment',
+              data: [{ path: app.catchmentHull }],
+              getPath: (d: { path: [number, number][] }) => d.path,
+              getColor: rgba(INK.sites, 220),
+              getWidth: 3,
+              widthUnits: 'pixels',
+              pickable: false,
+            }),
+          );
+        }
+
+        if (app.eventOrigins.length) {
+          layers.push(
+            new ScatterplotLayer({
+              id: 'event-origins',
+              data: app.eventOrigins,
+              getPosition: (d: [number, number]) => d,
+              getRadius: 40,
+              radiusUnits: 'meters',
+              radiusMinPixels: 1.5,
+              radiusMaxPixels: 6,
+              getFillColor: rgba(INK.events, 140),
+              stroked: false,
+              pickable: false,
+            }),
+          );
+        }
+
+        if (app.markers.length) {
+          layers.push(
+            new ScatterplotLayer({
+              id: 'markers',
+              data: app.markers,
+              getPosition: (d: { lon: number; lat: number }) => [d.lon, d.lat],
+              getRadius: 9,
+              radiusUnits: 'pixels',
+              radiusMinPixels: 7,
+              getFillColor: (d: { kind?: string }) =>
+                rgba(d.kind === 'event' ? INK.events : INK.sites, 255),
+              stroked: true,
+              getLineColor: [255, 255, 255, 255],
+              getLineWidth: 2,
+              lineWidthUnits: 'pixels',
+              pickable: false,
+            }),
+            new TextLayer({
+              id: 'marker-labels',
+              data: app.markers,
+              getPosition: (d: { lon: number; lat: number }) => [d.lon, d.lat],
+              getText: (d: { label: string }) => d.label,
+              getSize: 11,
+              getColor: [255, 255, 255, 255],
+              getTextAnchor: 'middle',
+              getAlignmentBaseline: 'center',
+              pickable: false,
+            }),
+          );
+        }
+
+        if (app.reportPoint) {
+          layers.push(
+            new ScatterplotLayer({
+              id: 'report-pin',
+              data: [app.reportPoint],
+              getPosition: (d: [number, number]) => d,
+              getRadius: 300,
+              radiusUnits: 'meters',
+              filled: false,
+              stroked: true,
+              getLineColor: rgba(INK.people, 170),
+              getLineWidth: 2,
+              lineWidthUnits: 'pixels',
+              pickable: false,
             }),
           );
         }
@@ -302,8 +455,6 @@ export function MapView() {
 
   return (
     <div className="map-root absolute inset-0">
-      {/* maplibre-gl.css forces position:relative on this element, which would
-          defeat absolute insets, so size it explicitly instead */}
       <div ref={host} className="h-full w-full" />
       {/* printed-paper grain: a static tiled gradient, so it costs nothing per frame */}
       <div

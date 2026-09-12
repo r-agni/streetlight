@@ -25,8 +25,8 @@ const WAIT_MS = Number(flag('wait', '9000'));
 const VIEWS = [
   { name: '01-city', zoom: 12.4, center: [-122.4183, 37.7775], settle: 2500 },
   { name: '02-downtown', zoom: 14.2, center: [-122.4014, 37.7899], settle: 2200 },
-  { name: '03-mission', zoom: 15.6, center: [-122.4192, 37.7599], settle: 2600 },
-  { name: '04-street', zoom: 17.0, center: [-122.4076, 37.7855], settle: 2600 },
+  { name: '03-mission', zoom: 15.8, center: [-122.4192, 37.7599], settle: 2800 },
+  { name: '04-street', zoom: 17.2, center: [-122.4076, 37.7855], settle: 2800 },
 ];
 
 async function main() {

@@ -7,8 +7,8 @@
  *
  * Two deliberate limits keep it cheap. Only agents inside the current view are
  * considered, and the set is capped, because the honest upper bound on useful
- * characters is a few thousand rather than the whole population. Frame choice
- * is plain arithmetic on a phase offset, so no per-agent state is kept between
+ * characters is a couple of thousand rather than the whole population. Frame
+ * choice is arithmetic on a per-agent phase, so no state is kept between
  * frames.
  */
 import { modeOf, personaOf, TravelMode } from '@sfcs/protocol';
@@ -18,31 +18,32 @@ import type { InterpolatedFrame } from '../ws/interpolator';
 export interface SpriteAtlas {
   cell: number;
   frames: number;
+  directions: string[];
   people: string[];
+  personaColours: Record<string, string>;
   vehicles: string[];
+  places: Record<string, string>;
   mapping: Record<string, { x: number; y: number; width: number; height: number }>;
 }
 
-/** Below this zoom, individual figures are smaller than the dot that replaces them. */
+/** Below this zoom, a figure is smaller than the dot that replaces it. */
 export const SPRITE_ZOOM = 14.9;
 
-/** Above this many on-screen figures, the view is a crowd and dots read better. */
+/** Above this many on-screen figures the view is a crowd, and dots read better. */
 const MAX_SPRITES = 2500;
 
-/** Walk cycles per simulated minute of travel. */
-const CYCLES_PER_SECOND = 1.35;
+/** Walk cycles per second of wall-clock time. */
+const CYCLES_PER_SECOND = 1.6;
 
-export interface SpriteSet {
-  /** Indices into the interpolated buffers, one per drawn figure. */
-  indices: Uint32Array;
-  count: number;
+export function makeSpriteBuffer(): Uint32Array {
+  return new Uint32Array(MAX_SPRITES);
 }
 
 /**
  * Collect the agents worth drawing as figures.
  *
- * `bounds` is the current viewport as [west, south, east, north], padded by the
- * caller so figures do not pop in at the edge.
+ * `bounds` is the viewport as [west, south, east, north], padded by the caller
+ * so figures do not pop in at the edge.
  */
 export function collectSprites(
   frame: InterpolatedFrame,
@@ -56,7 +57,7 @@ export function collectSprites(
 
   for (let i = 0; i < frame.count && n < out.length; i++) {
     // people resting at home are inside buildings; drawing them on the
-    // pavement would misrepresent where the street activity actually is
+    // pavement would misrepresent where street activity actually is
     if (kind[i] === 2) continue;
     const lon = pos[i * 2];
     const lat = pos[i * 2 + 1];
@@ -66,16 +67,21 @@ export function collectSprites(
   return n;
 }
 
-export function makeSpriteBuffer(): Uint32Array {
-  return new Uint32Array(MAX_SPRITES);
+/**
+ * Which way the figure faces.
+ *
+ * Heading is degrees counter-clockwise from due east, so the quadrants fall on
+ * the diagonals rather than the axes.
+ */
+export function facingOf(angleDegrees: number): string {
+  const a = ((angleDegrees % 360) + 360) % 360;
+  if (a >= 45 && a < 135) return 'up';
+  if (a >= 135 && a < 225) return 'left';
+  if (a >= 225 && a < 315) return 'down';
+  return 'right';
 }
 
-/**
- * Pick the atlas icon for one agent.
- *
- * `seconds` is wall-clock time, so the cycle keeps running smoothly regardless
- * of how fast the simulation clock is set.
- */
+/** The atlas icon for one agent. */
 export function iconNameFor(
   atlas: SpriteAtlas,
   packedSegment: number,
@@ -84,28 +90,38 @@ export function iconNameFor(
   index: number,
   seconds: number,
 ): string {
-  const facing = angleDegrees > 90 && angleDegrees < 270 ? 'l' : 'r';
   const mode = modeOf(packedSegment);
 
-  // A car or a bicycle carries the one person it is drawn for, so those icons
-  // are literally true. A bus is not: transit riders are individuals, and this
-  // model has no vehicles of its own - riders move along street geometry at a
-  // transit speed. Drawing one bus per rider put thousands of buses on
-  // residential streets, so riders are drawn as the people they are. Real
-  // vehicles need the regional GTFS feed, which is not wired up yet.
-  if (mode === TravelMode.Car) return `car_${Math.floor(seconds * 6) % 2}_${facing}`;
-  if (mode === TravelMode.Bike) return `bike_${Math.floor(seconds * 5) % 2}_${facing}`;
+  // A car or a bicycle carries the one person it is drawn for, so those are
+  // literally true. A bus is not: this model has no transit vehicles of its
+  // own, riders simply move along streets at a transit speed, and drawing one
+  // bus per rider put thousands of buses on residential streets. Riders are
+  // therefore drawn as the people they are.
+  if (mode === TravelMode.Car) return 'v_car';
+  if (mode === TravelMode.Bike) return 'v_bike';
 
   const persona = atlas.people[personaOf(packedSegment) % atlas.people.length];
-  if (kindByte !== 0) return `${persona}_0_${facing}`; // standing still
+  const facing = facingOf(angleDegrees);
+  if (kindByte !== 0) return `${persona}_${facing}_0`; // standing at a place
 
   // an offset per agent stops a whole street stepping in unison
   const phase = (index * 0.37) % 1;
   const f = Math.floor((seconds * CYCLES_PER_SECOND + phase) * atlas.frames) % atlas.frames;
-  return `${persona}_${f}_${facing}`;
+  return `${persona}_${facing}_${f}`;
 }
 
-/** Load the atlas image and its mapping, produced by scripts/make_sprites.mjs. */
+/** Vehicles are drawn nose-up, so rotate them from heading into screen space. */
+export function vehicleAngle(angleDegrees: number): number {
+  return angleDegrees - 90;
+}
+
+/** Whether this agent is drawn as a vehicle rather than a person. */
+export function isVehicle(packedSegment: number): boolean {
+  const mode = modeOf(packedSegment);
+  return mode === TravelMode.Car || mode === TravelMode.Bike;
+}
+
+/** Load the atlas mapping produced by scripts/make_sprites.mjs. */
 export async function loadAtlas(base = '/sprites'): Promise<SpriteAtlas | null> {
   try {
     const res = await fetch(`${base}/atlas.json`);

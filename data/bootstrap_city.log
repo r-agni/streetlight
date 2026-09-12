@@ -1,37 +1,37 @@
-[13:15:40] downloading walk network for bbox=(-122.517, 37.708, -122.357, 37.834)
-[13:16:36] graph: 54,236 nodes / 162,692 edges  (55.3s)
-[13:16:36] flattening edges and geometry
-[13:16:37] 161,010 unique directed edges  (1.7s)
-[13:16:37] indexing nodes to H3 resolution 9
-[13:16:38] H3 index built  (0.1s)
-[13:16:38] reading places from overture_places_sf.parquet
-[13:16:38] 53,059 of 55,341 Overture places mapped to the catalog  (0.6s)
-[13:16:38] largest categories: office=15417, retail=7735, clinic=7557, restaurant=5198, museum=2458, transit_stop=1937, bar=1673, school=1669, gym=1401, clothing=1332
-[13:16:38] placing 45,000 agents
-[13:16:38] agents placed  (0.0s)
-[13:16:38] grounding daily schedules
-[13:16:39]   5,000/45,000 agents scheduled
-[13:16:39]   10,000/45,000 agents scheduled
-[13:16:40]   15,000/45,000 agents scheduled
-[13:16:41]   20,000/45,000 agents scheduled
-[13:16:41]   25,000/45,000 agents scheduled
-[13:16:42]   30,000/45,000 agents scheduled
-[13:16:42]   35,000/45,000 agents scheduled
-[13:16:43]   40,000/45,000 agents scheduled
-[13:16:44] 209,773 schedule slots  (5.7s)
-[13:16:44] collecting legs
-[13:16:44] 137,541 legs over 132,128 unique origin/destination pairs  (0.1s)
-[13:16:44] routing 15,237 origins
-[13:16:46]   150/15,237 origins, 1,481 routes
-[13:16:59]   1,650/15,237 origins, 13,784 routes
-[13:17:14]   3,150/15,237 origins, 26,386 routes
-[13:17:27]   4,650/15,237 origins, 39,129 routes
-[13:17:40]   6,150/15,237 origins, 52,318 routes
-[13:17:51]   7,650/15,237 origins, 66,776 routes
-[13:18:05]   9,150/15,237 origins, 78,988 routes
-[13:18:15]   10,650/15,237 origins, 91,973 routes
-[13:18:25]   12,150/15,237 origins, 105,293 routes
-[13:18:35]   13,650/15,237 origins, 118,366 routes
-[13:18:46]   15,150/15,237 origins, 131,491 routes
-[13:18:49] 132,128 routes, 18,113,363 vertices  (125.1s)
-[13:18:50] done -> C:\Users\agni_\Documents\sfModeling\data\processed
+[13:45:47] downloading walk network for bbox=(-122.517, 37.708, -122.357, 37.834)
+[13:47:21] graph: 54,236 nodes / 162,692 edges  (94.2s)
+[13:47:21] flattening edges and geometry
+[13:47:23] 161,010 unique directed edges  (1.6s)
+[13:47:23] indexing nodes to H3 resolution 9
+[13:47:23] H3 index built  (0.1s)
+[13:47:23] reading places from overture_places_sf.parquet
+[13:47:24] 53,059 of 55,341 Overture places mapped to the catalog  (0.6s)
+[13:47:24] largest categories: office=15417, retail=7735, clinic=7557, restaurant=5198, museum=2458, transit_stop=1937, bar=1673, school=1669, gym=1401, clothing=1332
+[13:47:24] placing 45,000 agents
+[13:47:24] agents placed  (0.0s)
+[13:47:24] grounding daily schedules
+[13:47:25]   5,000/45,000 agents scheduled
+[13:47:25]   10,000/45,000 agents scheduled
+[13:47:26]   15,000/45,000 agents scheduled
+[13:47:27]   20,000/45,000 agents scheduled
+[13:47:27]   25,000/45,000 agents scheduled
+[13:47:28]   30,000/45,000 agents scheduled
+[13:47:29]   35,000/45,000 agents scheduled
+[13:47:29]   40,000/45,000 agents scheduled
+[13:47:30] 209,773 schedule slots  (6.2s)
+[13:47:30] collecting legs
+[13:47:30] 137,541 legs over 132,128 unique origin/destination pairs  (0.1s)
+[13:47:31] routing 15,237 origins
+[13:47:32]   150/15,237 origins, 1,481 routes
+[13:47:43]   1,650/15,237 origins, 13,784 routes
+[13:47:54]   3,150/15,237 origins, 26,386 routes
+[13:48:05]   4,650/15,237 origins, 39,129 routes
+[13:48:15]   6,150/15,237 origins, 52,318 routes
+[13:48:23]   7,650/15,237 origins, 66,776 routes
+[13:48:36]   9,150/15,237 origins, 78,988 routes
+[13:48:48]   10,650/15,237 origins, 91,973 routes
+[13:48:56]   12,150/15,237 origins, 105,293 routes
+[13:49:06]   13,650/15,237 origins, 118,366 routes
+[13:49:16]   15,150/15,237 origins, 131,491 routes
+[13:49:19] 132,128 routes, 18,113,363 vertices  (108.0s)
+[13:49:19] done -> C:\Users\agni_\Documents\sfModeling\data\processed

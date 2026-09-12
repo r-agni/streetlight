@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import os
 import time
 from pathlib import Path
 
@@ -18,8 +19,14 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 
+from .analysis import events as events_mod
+from .analysis import insight, layers
 from .engine.sim import MINUTES_PER_DAY, Simulation
 from .engine.world import load_world
+from .llm.assistant import Assistant
+from .llm.openai_provider import OpenAIAssistant
+from .live import feeds
+from .llm.tools import build_tools, geocode
 from .protocol import encode_frame, encode_grid_frame
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -55,6 +62,8 @@ class Hub:
         self.run_id = "run-0"
         self._task: asyncio.Task | None = None
         self._tps = 0.0
+        self.assistant: Assistant | None = None
+        self.tools: dict = {}
 
     def load(self) -> None:
         self.cfg = yaml.safe_load((ROOT / "config.yaml").read_text())
@@ -63,6 +72,11 @@ class Hub:
         self.frame_hz = float(self.cfg["sim"].get("frame_hz", 6))
         # start mid-morning so the first thing anyone sees is a busy city
         self.sim.seek(8 * 60 + 20)
+        self.tools = build_tools(ROOT, self.world, self.sim, self)
+        self.assistant = _make_assistant(self.tools)
+        print(f"assistant: {type(self.assistant).__name__} "
+              f"({'ready' if self.assistant.available else 'no key, keyword routing'})",
+              flush=True)
         print(
             f"world: {self.world.n_agents:,} agents, {self.world.n_pois:,} places, "
             f"{len(self.world.route_len):,} routes, grid {self.world.grid_shape}",
@@ -173,6 +187,34 @@ class Hub:
         }
 
 
+def _read_env(name: str) -> str | None:
+    """Read one value from .env, falling back to the process environment."""
+    env = ROOT / ".env"
+    if env.exists():
+        for line in env.read_text().splitlines():
+            if line.startswith(f"{name}="):
+                value = line.split("=", 1)[1].strip()
+                if value:
+                    return value
+    return os.environ.get(name) or None
+
+
+def _make_assistant(tools: dict):
+    """Pick a provider. OpenAI is preferred when configured, Claude otherwise.
+
+    Whichever is chosen, a missing or rejected key degrades to keyword routing
+    over the same tools rather than to an error.
+    """
+    provider = (_read_env("LLM_PROVIDER") or "anthropic").lower()
+    model = _read_env("LLM_MODEL")
+    if provider.startswith("openai"):
+        assistant = OpenAIAssistant(tools, model=model or "gpt-4.1")
+        if assistant.available:
+            return assistant
+        print("openai selected but no key found; falling back", flush=True)
+    return Assistant(tools, model=model or "claude-opus-5")
+
+
 hub = Hub()
 
 
@@ -281,6 +323,82 @@ def control(action: str, value: float | None = None) -> dict:
     }
 
 
+# ----------------------------------------------------------- data layers
+
+
+@app.get("/api/layers")
+def layer_index() -> dict:
+    """Which city data layers are loaded, and what is in them."""
+    return {"layers": layers.available(ROOT)}
+
+
+@app.get("/api/layer/{name}")
+def layer_points(name: str, category: str | None = None) -> dict:
+    return layers.points(ROOT, name, category)
+
+
+@app.get("/api/area")
+def area(lon: float, lat: float, radius: float = 300.0) -> dict:
+    """Everything known about one point: the click-anywhere report."""
+    report = layers.area_report(ROOT, lon, lat, radius)
+    report["footfall"] = insight.hourly_footfall(hub.world, hub.sim, lon, lat, 150.0)
+    report["places"] = insight.nearby_places(hub.world, lon, lat, radius, limit=14)
+    report["placeMix"] = insight.category_mix(hub.world, lon, lat, radius)
+    return report
+
+
+@app.get("/api/site")
+def site(lon: float, lat: float, category: str = "cafe") -> dict:
+    return insight.site_score(ROOT, hub.world, hub.sim, lon, lat, category)
+
+
+@app.get("/api/sites")
+def sites(category: str = "cafe", near: str | None = None, limit: int = 8) -> dict:
+    """Rank real registered vacancies for a kind of business."""
+    from .llm.tools import _candidate_frame
+
+    candidates = _candidate_frame(ROOT, hub.world, near)
+    if candidates.empty:
+        return {"category": category, "ranked": [], "note": "no candidate sites loaded"}
+    return {
+        "category": category,
+        "ranked": insight.rank_sites(ROOT, hub.world, hub.sim, category, candidates, limit),
+    }
+
+
+@app.get("/api/catchment")
+def catchment(lon: float, lat: float, minutes: float = 10.0) -> dict:
+    result = insight.walk_catchment(ROOT, hub.world, lon, lat, minutes)
+    return {
+        "method": result["method"],
+        "minutes": result["minutes"],
+        "hull": result["hull"],
+        "nodesReached": int(len(result["nodes"])),
+    }
+
+
+@app.get("/api/geocode")
+def geocode_place(place: str) -> dict:
+    lon, lat, resolved = geocode(place)
+    return {"lon": lon, "lat": lat, "resolved": resolved}
+
+
+@app.get("/api/live-events")
+def live_events(days: int = 45) -> dict:
+    """Real fixtures and listings coming up, for the events panel to plan against."""
+    return feeds.upcoming(days)
+
+
+@app.post("/api/event")
+def event_sim(venue: str, attendance: int = 15000, start_hour: int = 19) -> dict:
+    lon, lat, resolved = geocode(venue)
+    spec = events_mod.EventSpec(
+        lon=lon, lat=lat, name=resolved, attendance=attendance,
+        start_minute=start_hour * 60, end_minute=start_hour * 60 + 180,
+    )
+    return events_mod.simulate(hub.world, hub.sim, spec)
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket) -> None:
     await ws.accept()
@@ -304,12 +422,60 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                 msg = json.loads(raw)
             except json.JSONDecodeError:
                 continue
-            handle_client_message(msg)
+            if msg.get("type") == "ask":
+                asyncio.create_task(_answer(ws, msg))
+            else:
+                handle_client_message(msg)
     except WebSocketDisconnect:
         pass
     finally:
         pump_task.cancel()
         hub.clients.discard(queue)
+
+
+async def _answer(ws: WebSocket, msg: dict) -> None:
+    """Run one assistant question, streaming everything it produces."""
+    if hub.assistant is None:
+        return
+
+    async def emit(event: dict) -> None:
+        try:
+            await ws.send_text(json.dumps(event))
+        except Exception:
+            pass  # the client went away mid-answer
+
+    question = str(msg.get("text", ""))
+    try:
+        await hub.assistant.ask(question, msg.get("context") or {}, emit)
+    except Exception as exc:
+        name = type(exc).__name__
+        if "Authentication" in name or "PermissionDenied" in name:
+            # a rejected key should still answer, just without the model
+            from .llm import fallback
+
+            tool, arguments = fallback.route(question)
+            fn = hub.tools.get(tool)
+            if fn is not None:
+                try:
+                    result = fn(**arguments)
+                    for action in result.map_actions:
+                        await emit({"type": "mapAction", **action})
+                    await emit({"type": "assistantTool", "name": tool, "status": "ok"})
+                    await emit({
+                        "type": "assistantDelta",
+                        "text": fallback.render(tool, result.payload) + fallback.NOTICE,
+                        "done": True,
+                    })
+                    return
+                except Exception:
+                    pass
+        await emit(
+            {
+                "type": "assistantDelta",
+                "text": f"The assistant failed: {type(exc).__name__}: {exc}",
+                "done": True,
+            }
+        )
 
 
 def handle_client_message(msg: dict) -> None:

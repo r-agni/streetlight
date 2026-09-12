@@ -53,6 +53,9 @@ class Simulation:
         self.grid_cells = rows * cols
         self.grid_now = np.zeros(self.grid_cells, dtype=np.int32)
         self.grid_hour = np.zeros((24, self.grid_cells), dtype=np.int32)
+        # samples folded into each hour, so a replayed hour can be averaged
+        # rather than counted twice
+        self.grid_hour_samples = np.zeros(24, dtype=np.int32)
         self.poi_visits = np.zeros((24, max(world.n_pois, 1)), dtype=np.int32)
 
         self._cos_lat = float(np.cos(np.radians(float(np.mean(world.node_lat)))))
@@ -194,6 +197,7 @@ class Simulation:
         flat = gi[inside] * cols + gj[inside]
         self.grid_now = np.bincount(flat, minlength=self.grid_cells).astype(np.int32)
         self.grid_hour[self.hour] += self.grid_now
+        self.grid_hour_samples[self.hour] += 1
 
     # -------------------------------------------------------------- reporting
     def counts(self) -> dict[str, int]:
@@ -212,10 +216,17 @@ class Simulation:
         return [(int(i), int(self.grid_now[i])) for i in idx]
 
     def seek(self, minute_of_week: int) -> None:
-        """Jump to a time by replaying ticks from the start of that day."""
+        """Jump to a time by replaying ticks from the start of that day.
+
+        The replayed minutes would otherwise be folded into the hourly density
+        totals a second time, so those totals are cleared first and rebuilt by
+        the replay.
+        """
         target = int(minute_of_week) % (MINUTES_PER_DAY * DAYS_PER_WEEK)
         day = target // MINUTES_PER_DAY
         self.minute_of_week = day * MINUTES_PER_DAY
+        self.grid_hour[:] = 0
+        self.grid_hour_samples[:] = 0
         self._reset_day()
         while self.minute_of_day != target % MINUTES_PER_DAY:
             self.step()

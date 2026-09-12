@@ -43,6 +43,8 @@ class World:
     poi_node: np.ndarray
     poi_name: list[str]
     poi_attr: np.ndarray
+    poi_rating: np.ndarray  # Google rating where known, NaN otherwise
+    poi_reviews: np.ndarray  # Google review count where known, -1 otherwise
 
     # agents
     agent_home: np.ndarray
@@ -161,6 +163,16 @@ def load_world(root: Path) -> World:
         poi_node=pois["node_id"].to_numpy(np.int32),
         poi_name=pois["name"].astype(str).tolist(),
         poi_attr=pois["attractiveness"].to_numpy(np.float32),
+        poi_rating=(
+            pois["rating"].to_numpy(np.float32)
+            if "rating" in pois.columns
+            else np.full(len(pois), np.nan, np.float32)
+        ),
+        poi_reviews=(
+            pois["user_rating_count"].to_numpy(np.int32)
+            if "user_rating_count" in pois.columns
+            else np.full(len(pois), -1, np.int32)
+        ),
         agent_home=agents["home_node_id"].to_numpy(np.int32),
         agent_work=agents["work_node_id"].to_numpy(np.int32),
         agent_arch=agents["archetype_id"].to_numpy(np.int16),

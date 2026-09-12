@@ -496,6 +496,23 @@ def main() -> None:
         }
     ).to_parquet(OUT / "network_nodes.parquet", index=False)
 
+    # the graph itself, so walking catchments can be measured along streets
+    # rather than approximated with a circle
+    np.savez_compressed(
+        OUT / "graph_walk.npz",
+        indptr=csr.indptr.astype(np.int64),
+        indices=csr.indices.astype(np.int32),
+        weights=csr.data.astype(np.float32),
+        n_nodes=np.int64(n_nodes),
+    )
+    pd.DataFrame(
+        {
+            "u": keys[:, 0].astype(np.int32),
+            "v": keys[:, 1].astype(np.int32),
+            "length_m": vals.astype(np.float32),
+        }
+    ).to_parquet(OUT / "network_edges.parquet", index=False)
+
     # ---------------------------------------------------------------- POIs
     overture = RAW / "overture_places_sf.parquet"
     if args.places == "overture" and overture.exists():
@@ -835,7 +852,18 @@ def main() -> None:
             indent=2,
         )
     )
+    # Carry across anything this script did not produce. Other scripts write
+    # into the same directory (city open data, enrichment), and a blind swap
+    # would silently delete their output.
     if final_out.exists():
+        ours = {f.name for f in OUT.iterdir()}
+        kept = 0
+        for existing in final_out.iterdir():
+            if existing.name not in ours:
+                shutil.move(str(existing), str(OUT / existing.name))
+                kept += 1
+        if kept:
+            log(f"preserved {kept} file(s) written by other scripts")
         shutil.rmtree(final_out)
     OUT.rename(final_out)
     log(f"done -> {final_out}")

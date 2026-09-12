@@ -6,6 +6,7 @@
 import { SimConnection } from '../ws/client';
 import { Interpolator } from '../ws/interpolator';
 import { useSim } from '../state/simStore';
+import { useApp } from '../state/appStore';
 
 const WS_URL = import.meta.env.VITE_SIM_WS ?? 'ws://localhost:8000/ws';
 export const API_URL = import.meta.env.VITE_SIM_API ?? 'http://localhost:8000';
@@ -47,6 +48,18 @@ export function startConnection(): void {
           ticksPerSecond: msg.ticksPerSecond,
         });
         break;
+      case 'assistantDelta': {
+        const app = useApp.getState();
+        if (msg.text) app.appendToLast(msg.text);
+        if (msg.done) app.setAssistantBusy(false);
+        break;
+      }
+      case 'assistantTool':
+        useApp.getState().noteTool(msg.name, msg.status);
+        break;
+      case 'mapAction':
+        applyMapAction(msg as unknown as MapActionEvent);
+        break;
       case 'error':
         console.warn('simulation error:', msg.message);
         break;
@@ -54,6 +67,56 @@ export function startConnection(): void {
   });
 
   connection.connect();
+}
+
+interface MapActionEvent {
+  action: string;
+  payload: Record<string, unknown>;
+}
+
+/** Tool side effects: the map reacts while the answer is still being written. */
+function applyMapAction(event: MapActionEvent): void {
+  const app = useApp.getState();
+  const p = event.payload ?? {};
+  switch (event.action) {
+    case 'flyTo': {
+      const fly = (window as unknown as {
+        __setView?: (c: [number, number], z: number) => void;
+      }).__setView;
+      fly?.([Number(p.lon), Number(p.lat)], Number(p.zoom ?? 15));
+      break;
+    }
+    case 'highlight':
+      app.setMarkers(
+        ((p.markers as { label: string; lon: number; lat: number }[]) ?? []).map((m) => ({
+          ...m,
+          kind: String(p.kind ?? 'pin'),
+        })),
+      );
+      break;
+    case 'event':
+      app.setMarkers([
+        {
+          label: String(p.label ?? 'Event'),
+          lon: Number(p.lon),
+          lat: Number(p.lat),
+          kind: 'event',
+        },
+      ]);
+      app.setEventOrigins((p.origins as [number, number][]) ?? []);
+      break;
+    case 'setLayer':
+      app.setLayerOn(String(p.layer), p.on !== false);
+      break;
+    case 'setTime':
+      useSim.getState().set({ minute: Number(p.minute) });
+      break;
+    case 'clear':
+      app.setMarkers([]);
+      app.setCatchmentHull(null);
+      app.setEventOrigins([]);
+      break;
+  }
 }
 
 interface SimGrid {
