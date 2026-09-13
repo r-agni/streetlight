@@ -46,7 +46,9 @@ export function PosterCard() {
             ? 'Looking back'
             : clock?.horizon === 'future'
               ? 'Projected'
-              : 'Now in San Francisco'}
+              : clock?.horizon === 'running'
+                ? 'Running on from now'
+                : 'Now in San Francisco'}
         </div>
       </div>
 

@@ -204,10 +204,14 @@ class Hub:
         state["elapsedMinutes"] = int(elapsed)
         if horizon == "live" and elapsed > 90:
             hours = elapsed / 60.0
+            # Not a projection of a chosen date: the same typical week simply
+            # rolling on from now. Calling that "projected" invites the reader
+            # to treat it as a forecast of a specific day.
+            state["horizon"] = "running"
             state["describe"] = (
-                f"Simulating forward from now: {instant.label}, "
-                f"{hours:.1f} hours past the real clock. Press the live button to "
-                "return to the present."
+                f"Running on from now: {instant.label}, {hours:.1f} hours past "
+                "the real clock. This is the modelled week continuing, not a "
+                "forecast of that date. Press the live button to return."
             )
         return state
 

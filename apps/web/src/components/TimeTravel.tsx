@@ -16,6 +16,7 @@ import { useSim, type ClockState } from '../state/simStore';
 const HORIZON_STYLE: Record<string, { label: string; className: string }> = {
   past: { label: 'looking back', className: 'bg-[#8b3dff]/12 text-[#6d2ecb]' },
   live: { label: 'now', className: 'bg-[#00a878]/14 text-[#00875f]' },
+  running: { label: 'running on', className: 'bg-[#00a6c0]/16 text-[#00697c]' },
   future: { label: 'projected', className: 'bg-[#f5b301]/18 text-[#8a6400]' },
 };
 

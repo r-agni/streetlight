@@ -21,7 +21,7 @@ export interface GridMeta {
 export interface ClockState {
   iso: string;
   minute: number;
-  horizon: 'past' | 'live' | 'future';
+  horizon: 'past' | 'live' | 'running' | 'future';
   dayName: string;
   label: string;
   daysFromNow: number;
