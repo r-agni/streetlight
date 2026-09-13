@@ -222,6 +222,15 @@ export const SUGGESTIONS: Record<Mode, Suggestion[]> = {
         'is busier and which has more reported problems, and mark both on the map.',
     },
     {
+      label: 'Who actually lives in a neighbourhood?',
+      detail: 'Census population, income, language and commute',
+      prompt:
+        'Who lives in the Mission? Give me the census picture: population, median ' +
+        'income and rent, what share were born abroad, what languages are spoken ' +
+        'at home, how many households have no car, and how that compares with the ' +
+        'city as a whole. Say which figures carry a wide margin of error.',
+    },
+    {
       label: 'Where do complaints cluster?',
       detail: 'The worst blocks, and what people are reporting',
       prompt:
@@ -281,6 +290,16 @@ export const SUGGESTIONS: Record<Mode, Suggestion[]> = {
         'Which parts of San Francisco have the most building permits filed in the ' +
         'last three years, and how many homes do they propose? Turn the permit ' +
         'layer on and take me to the busiest area.',
+    },
+    {
+      label: 'Who lives here, and who is being squeezed?',
+      detail: 'Census population, income, rent burden and car access',
+      prompt:
+        'Using census data, which San Francisco neighbourhoods have the highest ' +
+        'share of renters paying over 30 percent of their income on rent, and what ' +
+        'are the population, median income and car ownership in the worst three? ' +
+        'Quote the margins of error and say where the estimates are too imprecise ' +
+        'to act on.',
     },
   ],
   events: [

@@ -24,7 +24,7 @@ import pandas as pd
 
 from ..engine import calendar
 from ..analysis import events as events_mod
-from ..analysis import insight, layers, opportunity, research, websearch
+from ..analysis import demographics, insight, layers, opportunity, research, websearch
 from .contracts import (
     Source,
     ToolResult,
@@ -360,10 +360,23 @@ def build_tools(root: Path, world, sim, hub) -> dict:
                 )
 
         # 3. who lives there
-        demographics = research.census_tracts([])
-        if not demographics.get("available"):
+        residents = research.demographics_near(lon, lat, 900.0)
+        if residents.get("available"):
+            shares = residents.get("shares", {})
+            medians = residents.get("medians", {})
+            income = medians.get("median_household_income")
+            found.notes.append(
+                f"{residents.get('population', 0):,} residents live in the "
+                f"{residents.get('tractsCounted', 0)} census tracts around this point"
+                + (f", median household income ${income:,.0f}." if income else ".")
+            )
+            for label in ("Bachelor's degree or higher", "Foreign born",
+                          "Households with no car"):
+                if label in shares:
+                    found.notes.append(f"{label}: {shares[label]:g}% of them.")
+        else:
             found.unavailable.append(
-                {"source": "Census ACS", "reason": demographics.get("reason", "")}
+                {"source": "Census ACS", "reason": residents.get("reason", "")}
             )
 
         # 4. public discussion
@@ -397,7 +410,7 @@ def build_tools(root: Path, world, sim, hub) -> dict:
             "tradingNow": unique[:8],
             "customerQuotes": quotes[:6],
             "vacancyNearby": (vacancy or {}).get("total", 0),
-            "demographics": demographics,
+            "demographics": residents,
             **found.to_dict(),
         }
 
@@ -420,13 +433,16 @@ def build_tools(root: Path, world, sim, hub) -> dict:
                     count=len(quotes),
                 )
             )
-        if demographics.get("available"):
+        if residents.get("available"):
             sources.append(
                 Source(
-                    label="Census ACS 2023",
+                    label="American Community Survey, 5-year estimates",
                     kind="recorded",
-                    detail="Tract population, income, rent and detailed origin",
-                    count=len(demographics.get("tracts", [])),
+                    detail=(
+                        "Population, income, rent, education and car ownership for the "
+                        "census tracts around this point"
+                    ),
+                    count=residents.get("tractsCounted", 0),
                 )
             )
         if vacancy:
@@ -795,8 +811,126 @@ def build_tools(root: Path, world, sim, hub) -> dict:
             "; ".join(did) if did else "No interface change requested.",
         )
 
+    def get_demographics(
+        place: str | None = None,
+        measure: str | None = None,
+        compare_with: list[str] | None = None,
+        community: str | None = None,
+        top: int = 10,
+        lowest_first: bool = False,
+    ) -> ToolResult:
+        """Who lives somewhere, from the census. Recorded, never modelled."""
+        if not demographics.available():
+            return ToolResult(
+                {"available": False,
+                 "reason": "Census tables are not built. Run scripts/06_census.py."},
+                [],
+                [Source(label="Census ACS", kind="reference",
+                        detail="Tables not built on this machine")],
+                "Census data is not loaded.",
+            )
+
+        source = Source(
+            label="American Community Survey, 5-year estimates",
+            kind="recorded",
+            detail=("Census Bureau survey estimates for San Francisco tracts, rolled up "
+                    "to the city's 42 analysis neighbourhoods; every figure carries its "
+                    "margin of error"),
+            count=242,
+        )
+        actions: list[dict] = []
+
+        # asked about a specific community the tables do not break out
+        if community:
+            payload = demographics.community(community, place)
+            summary = payload.get("limit", "")
+            if place:
+                lon, lat, resolved = geocode(place)
+                actions.append({"action": "flyTo",
+                                "payload": {"lon": lon, "lat": lat, "zoom": 13.6,
+                                            "label": resolved}})
+            return ToolResult(payload, actions, [source], summary)
+
+        # ranked: which neighbourhoods lead or trail on one measure
+        if measure and not place:
+            payload = demographics.rank(measure, top=top, ascending=lowest_first)
+            if payload.get("available") and payload.get("places"):
+                markers = []
+                for entry in payload["places"][:8]:
+                    try:
+                        lon, lat, _ = geocode(entry["place"])
+                    except Exception:
+                        continue
+                    markers.append({"label": f"{entry['place']} {entry['value']:g}",
+                                    "lon": lon, "lat": lat})
+                if markers:
+                    actions.append({"action": "highlight",
+                                    "payload": {"markers": markers, "kind": "pin"}})
+                    actions.append({"action": "flyTo",
+                                    "payload": {"lon": -122.4383, "lat": 37.7599,
+                                                "zoom": 11.6, "label": "San Francisco"}})
+            leaders = ", ".join(
+                f"{e['place']} {e['value']:g}" for e in payload.get("places", [])[:3]
+            )
+            return ToolResult(payload, actions, [source],
+                              f"Ranked neighbourhoods by {payload.get('measure', measure)}"
+                              + (f": {leaders}." if leaders else "."))
+
+        # side by side
+        if compare_with:
+            names = ([place] if place else []) + list(compare_with)
+            payload = demographics.compare(names)
+            markers = []
+            for name in payload.get("places", []):
+                try:
+                    lon, lat, _ = geocode(name)
+                except Exception:
+                    continue
+                markers.append({"label": name[:22], "lon": lon, "lat": lat})
+            if markers:
+                actions.append({"action": "highlight",
+                                "payload": {"markers": markers, "kind": "pin"}})
+            return ToolResult(payload, actions, [source],
+                              "Compared " + " and ".join(payload.get("places", [])) + ".")
+
+        # one place
+        if place:
+            payload = demographics.profile(place)
+            if not payload.get("available"):
+                # not a named neighbourhood: fall back to the tracts around it
+                lon, lat, resolved = geocode(place)
+                payload = demographics.near(lon, lat, 1000.0)
+                payload["resolvedPlace"] = resolved
+                actions.append({"action": "flyTo",
+                                "payload": {"lon": lon, "lat": lat, "zoom": 14.4,
+                                            "label": resolved}})
+                summary = (f"Census tracts within 1 km of {resolved}: "
+                           f"{payload.get('population', 0):,} residents.")
+            else:
+                lon, lat, resolved = geocode(payload["place"])
+                actions.append({"action": "flyTo",
+                                "payload": {"lon": lon, "lat": lat, "zoom": 13.8,
+                                            "label": payload["place"]}})
+                population = payload.get("headline", {}).get("Population", {}).get("value")
+                summary = (f"{payload['place']}: "
+                           + (f"{population:,.0f} residents across " if population else "")
+                           + f"{payload.get('tracts', 0)} census tracts.")
+            return ToolResult(payload, actions, [source], summary)
+
+        # nothing named: the city as a whole
+        payload = {
+            "available": True,
+            "place": "San Francisco",
+            "citywide": demographics._citywide(),
+            "neighborhoods": demographics.neighborhoods(),
+            "source": demographics.SOURCE_NOTE,
+        }
+        return ToolResult(payload, [], [source],
+                          "Citywide census figures and the 42 neighbourhoods available.")
+
     return {
         "get_area_report": get_area_report,
+        "get_demographics": get_demographics,
         "find_opportunity": find_opportunity,
         "research_demand": research_demand,
         "search_public_discussion": search_public_discussion,

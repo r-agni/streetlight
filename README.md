@@ -54,6 +54,9 @@ node scripts/make_sprites.mjs
 # city open data: complaints, incidents, vacancy, permits, land use
 uv run --project apps/sim python scripts/05_datasf.py
 
+# census: population, income, rent, education, language, commute (no key needed)
+uv run --project apps/sim python scripts/06_census.py
+
 # two processes
 npm run sim     # simulation service on :8000
 npm run dev     # interface on :5173
@@ -116,3 +119,36 @@ All free. OpenStreetMap for the street network, Overture Maps for places,
 OpenFreeMap for basemap tiles, and optionally Google Places for ratings.
 See [docs/RESEARCH_SPEC.md](docs/RESEARCH_SPEC.md) for the wider survey of
 sources and prior work.
+
+### Census and demographics
+
+Population questions are answered from the American Community Survey, covering
+all 242 San Francisco census tracts and rolled up to the city's 42 analysis
+neighbourhoods and 11 supervisor districts: population and age, household
+income by race, contract rent, home value, rent burden, poverty, education,
+employment, language spoken at home, place of birth, car ownership and commute
+mode.
+
+The Census Bureau's own API now rejects unauthenticated requests, so
+`scripts/06_census.py` reads the same estimates from two keyless mirrors: Esri's
+Living Atlas for the full ACS tables, and DataSF for counts the city has already
+aggregated to neighbourhoods. Nothing here needs a signup.
+
+Three rules are enforced in code and covered by tests, because breaking any of
+them produces an answer that is confident and wrong:
+
+- **Margins of error survive to the answer.** Every figure carries its margin. A
+  figure whose margin exceeds a third of its value is marked imprecise, and
+  comparing two places says outright when the gap between them falls inside the
+  combined error.
+- **Shares are recomputed from counts, never averaged.** Summing tract
+  percentages once reported Chinatown as 475 percent Asian.
+- **A broad category never stands in for a narrow one.** The keyless tables stop
+  at "Asian" and "born in Asia". Asked about a specific national origin, the
+  assistant returns the broad measures, says plainly that the census does not
+  break that group out, and points at the language figures instead.
+
+Rankings also hold out places whose base is too thin to measure. Seacliff's 55
+percent cost-burdened renters rests on 229 renter households, and left in it
+outranked the Tenderloin's 17,572. Held-out places are named in the result
+rather than dropped silently.

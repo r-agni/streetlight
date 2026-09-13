@@ -11,9 +11,10 @@ What is actually reachable, and what is not:
 - **Google Place Details** returns real review text. This is the closest thing
   to hearing customers in their own words, and quotes are returned with the
   business name so an answer can cite them.
-- **Census American Community Survey** gives who lives there. The API began
-  requiring a key, so this degrades to an explicit "not configured" rather than
-  to a guess.
+- **Census American Community Survey** gives who lives there. The Bureau's own
+  API began demanding a key, so the same estimates are mirrored keylessly and
+  pulled ahead of time by `scripts/06_census.py`; `demographics_near` reads
+  those tables. Every figure keeps its margin of error.
 - **Reddit** refuses unauthenticated requests: both the search endpoint and the
   old host return 403 or 404 without an OAuth app. It is reported as
   unavailable rather than quietly skipped, because "no discussion found" and
@@ -78,17 +79,6 @@ def _google_key() -> str | None:
                 if key:
                     return key
     return os.environ.get("GOOGLE_MAPS_API_KEY") or None
-
-
-def _census_key() -> str | None:
-    env = ROOT / ".env"
-    if env.exists():
-        for line in env.read_text().splitlines():
-            if line.startswith("CENSUS_API_KEY="):
-                key = line.split("=", 1)[1].strip()
-                if key:
-                    return key
-    return os.environ.get("CENSUS_API_KEY") or None
 
 
 def _cached(name: str, fetch):
@@ -216,68 +206,27 @@ def fetch_reviews(place_id: str, limit: int = 4) -> list[dict]:
 # --------------------------------------------------------------- demographics
 
 
-ACS_VARIABLES = {
-    "B01003_001E": "population",
-    "B19013_001E": "median_household_income",
-    "B01002_001E": "median_age",
-    "B25064_001E": "median_gross_rent",
-    "B02015_021E": "asian_indian",
-    "B02015_002E": "chinese",
-    "B03001_003E": "hispanic_latino",
-    "B15003_022E": "bachelors",
-}
+def demographics_near(lon: float | None, lat: float | None, radius_m: float = 900.0) -> dict:
+    """Who lives around a point, from the census tables built by 06_census.py.
 
+    This replaced a live call to the Census Bureau API, which now refuses
+    unauthenticated requests. The data is the same American Community Survey,
+    reached through keyless mirrors and pulled ahead of time, so a question
+    asked at 2am does not depend on a signup.
+    """
+    from . import demographics as demo
 
-def census_tracts(tracts: list[str]) -> dict:
-    """Live ACS lookup for named tracts. Needs a free Census API key."""
-    key = _census_key()
-    if not key:
+    if not demo.available():
         return {
             "available": False,
             "reason": (
-                "The Census API now requires a key. Add a free one from "
-                "api.census.gov/data/key_signup.html as CENSUS_API_KEY."
+                "Census tables have not been built on this machine. "
+                "Run scripts/06_census.py, which needs no API key."
             ),
         }
-    import httpx
-
-    def fetch():
-        response = httpx.get(
-            "https://api.census.gov/data/2023/acs/acs5",
-            params={
-                "get": "NAME," + ",".join(ACS_VARIABLES),
-                "for": "tract:*",
-                "in": "state:06 county:075",
-                "key": key,
-            },
-            timeout=90,
-            follow_redirects=True,
-        )
-        response.raise_for_status()
-        return response.json()
-
-    try:
-        rows = _cached("acs_sf_tracts", fetch)
-    except Exception as exc:
-        return {"available": False, "reason": f"{type(exc).__name__}: {exc}"}
-
-    header, *records = rows
-    index = {name: i for i, name in enumerate(header)}
-    wanted = set(tracts)
-    out = []
-    for record in records:
-        geoid = "06075" + record[index["tract"]]
-        if wanted and geoid not in wanted:
-            continue
-        entry = {"tract": geoid, "name": record[index["NAME"]].split(";")[0]}
-        for variable, column in ACS_VARIABLES.items():
-            try:
-                value = float(record[index[variable]])
-                entry[column] = value if value > -1e6 else None
-            except (TypeError, ValueError):
-                entry[column] = None
-        out.append(entry)
-    return {"available": True, "tracts": out}
+    if lon is None or lat is None:
+        return {"available": True, "citywide": demo._citywide(), "source": demo.SOURCE_NOTE}
+    return demo.near(lon, lat, radius_m)
 
 
 # ---------------------------------------------------------------- discussion

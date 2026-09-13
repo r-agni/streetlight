@@ -72,6 +72,15 @@ TOOLS
   from the platform, so quote something only when a link points at the platform
   it is attributed to. If the tool returns an attribution warning, tell the user
   the discussion could not be verified rather than repeating the quote.
+- get_demographics: who lives somewhere, from the census. Population, income,
+  rent and rent burden, education, poverty, race, foreign born, language, car
+  ownership and commute mode, for any of the 42 neighbourhoods or around any
+  address. Use it for any question about population or who a place serves, and
+  before claiming an area fits a customer base. These are recorded survey
+  estimates, so quote the margin of error when it is wide, and never present a
+  figure the tool marks imprecise as settled. Asked about a specific national or
+  ethnic community, pass community: the census stops at broad categories like
+  Asian, and you must say so rather than letting the broad figure stand in.
 - rank_sites: score real vacant parcels for a category.
 - simulate_event: who comes to a large event, from where, and what fills up.
 - compare_areas: two to four places side by side.
@@ -126,6 +135,59 @@ def tool_definitions() -> list[dict]:
                     "radius_metres": {"type": "number", "default": 300},
                 },
                 "required": ["place"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "get_demographics",
+            "description": (
+                "Who lives somewhere, from the American Community Survey: population, "
+                "age, income, rent and rent burden, education, poverty, race and "
+                "Hispanic origin, foreign born, language spoken at home, car ownership "
+                "and commute mode. Recorded survey data covering all 242 San Francisco "
+                "census tracts, rolled up to the city's 42 analysis neighbourhoods. "
+                "Every figure comes back with its margin of error. Call with a place "
+                "for a profile, with measure alone to rank neighbourhoods, with "
+                "compare_with to set places side by side, or with community when asked "
+                "about a specific national or ethnic group."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "place": {
+                        "type": "string",
+                        "description": (
+                            "Neighbourhood, address or corner. A named neighbourhood "
+                            "gives the full profile; anything else falls back to the "
+                            "census tracts within a kilometre."
+                        ),
+                    },
+                    "measure": {
+                        "type": "string",
+                        "description": (
+                            "Rank neighbourhoods by one measure, for example "
+                            "pct_households_no_car, median_household_income, "
+                            "pct_below_poverty, pct_renters_cost_burdened, "
+                            "pct_bachelors_or_higher, pct_foreign_born, "
+                            "pct_commute_transit. Leave place empty when ranking."
+                        ),
+                    },
+                    "compare_with": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Other neighbourhoods to compare against place.",
+                    },
+                    "community": {
+                        "type": "string",
+                        "description": (
+                            "A specific national or ethnic group, for example Indian or "
+                            "Salvadoran. Returns the closest recorded measures and states "
+                            "plainly that the census does not break that group out."
+                        ),
+                    },
+                    "top": {"type": "number", "default": 10},
+                    "lowest_first": {"type": "boolean", "default": False},
+                },
                 "additionalProperties": False,
             },
         },
