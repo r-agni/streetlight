@@ -166,7 +166,7 @@ Repository: https://github.com/r-agni/streetlight
 Walkthrough: [`docs/video/streetlight-demo-720p.mp4`](video/streetlight-demo-720p.mp4),
 eight minutes forty. A real browser driving the running services, so every figure on
 screen was computed during the take. The three question chapters start at 03:08
-(business), 06:12 (planner) and 07:12 (city operations).
+(business), 05:47 (planner) and 06:48 (city operations).
 
 Screenshots in [`docs/shots/`](shots/). Runs locally in two processes; setup is in the
 README and takes about six minutes of data building.

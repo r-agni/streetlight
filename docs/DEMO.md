@@ -49,21 +49,22 @@ off the video rather than computed from the script. A fresh take will drift:
 chapters 6 to 8 each wait on a live model answer, and those ran between one and
 three minutes apiece.
 
-1. **00:13** The whole city at commute hour, 45,000 agents on the real street
+1. **00:04** The whole city at commute hour, 45,000 agents on the real street
    network.
-2. **00:31** Pushing in on downtown, where the dots resolve into people.
+2. **00:18** Pushing in on downtown, where the dots resolve into people.
 3. **00:43** Street level: pixel characters walking, vehicles, and place signs
    by category.
-4. **01:33** City data layers switched on one at a time, close enough to read.
-5. **02:48** Clicking a block for its report: footfall by hour, complaints,
-   incidents, permits, land use, and the places already there.
+4. **01:54** City data layers switched on one at a time, close enough to read.
+5. **02:50** Clicking a block on the map and drawing its catchment. The report
+   itself, footfall by hour, complaints, incidents, permits, land use and the
+   places already there, appears with the panel in the next chapter.
 6. **03:08** **Business** — a chai house with a stated budget and customer,
    answered with real vacant addresses and quoted reviews.
-7. **06:12** **Planner** — the Tenderloin: complaints, walkability and what is
+7. **05:47** **Planner** — the Tenderloin: complaints, walkability and what is
    being built, with the assistant switching the matching layers on itself.
-8. **07:12** **City operations** — a sold-out Warriors game: transit surge,
+8. **06:48** **City operations** — a sold-out Warriors game: transit surge,
    departure crush and block-level crowding.
-9. **08:12** Time travel back and forward, then back to now.
+9. **07:39** Time travel back and forward, then back to now.
 
 The clock is re-anchored between chapters. Without that the take drifts five
 simulated days ahead of real time, and later chapters carry a date nobody asked
