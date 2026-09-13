@@ -34,8 +34,13 @@ const HEIGHT = 900;
 const beat = (ms) => Math.round(ms * (FAST ? 0.35 : 1));
 
 async function main() {
-  await rm(OUT, { recursive: true, force: true });
+  // Clear only what a previous take left behind. Wiping the whole directory
+  // would take the committed 720p cut with it, and the loss is silent: the
+  // next push quietly deletes a file the README links to.
   await mkdir(OUT, { recursive: true });
+  for (const name of await readdir(OUT)) {
+    if (name.endsWith('.webm')) await rm(path.join(OUT, name), { force: true });
+  }
 
   // start from a known moment so the take is reproducible: a weekday morning
   // when the commute is visibly under way

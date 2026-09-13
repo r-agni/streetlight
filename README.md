@@ -7,6 +7,34 @@ audiences — urban planners, city operations, and businesses choosing a site.
 
 ![City view](docs/shots/01-city.png)
 
+## The demo
+
+![Street level](docs/shots/street-loop.gif)
+
+8 seconds at street level: pixel residents walking real sidewalks, each one
+following a schedule the simulation gave them, with places marked by category.
+
+**[The full walkthrough](docs/video/streetlight-demo-720p.mp4)** runs 8:40,
+recorded by driving a real browser against the running services, so every figure
+on screen was computed during the take. GitHub serves committed video as a
+download rather than playing it in the page, so the link saves the file, about
+14 MB at 720p. Cloning gets it too.
+
+| The city | The data | The three audiences |
+|---|---|---|
+| **00:13** The whole city at commute hour | **01:33** City data layers, one at a time | **03:08** Business: where to sign a lease |
+| **00:31** Pushing in on downtown | **02:48** Clicking a block for its report | **06:12** Planner: the Tenderloin |
+| **00:43** Street level: characters and signs | | **07:12** Operations: a sold-out game |
+| | | **08:12** Time travel, then back to now |
+
+The third column is the assistant answering in full. A chai house with a stated
+budget, answered with real vacant addresses and quoted reviews. The Tenderloin's
+complaints, walkability and permits, with the matching layers switched on
+without being asked. A Warriors game at Chase Center, with the arrival curve,
+the departure crush and the blocks that fill up.
+
+[`docs/DEMO.md`](docs/DEMO.md) covers how to record it again.
+
 ## The three things it answers
 
 **Businesses** — rank real vacant parcels for a category, with modelled footfall

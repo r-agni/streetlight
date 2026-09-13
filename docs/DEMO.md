@@ -13,23 +13,57 @@ node scripts/record_demo.mjs --out docs/video
 Add `--fast` to rehearse the whole run in about a third of the time, which is
 how to check the selectors still match after an interface change.
 
-The video is not committed: it is ~86 MB and regenerating it takes one command.
+Playwright writes WebM, which is why the commands below read `.webm` while the
+file committed here is `.mp4`: the take was converted after recording and the
+WebM was not kept. Two commands turn a fresh recording into what the README
+carries, an MP4 that plays once downloaded and a short loop that animates in
+the page:
+
+```bash
+ffmpeg -i docs/video/streetlight-demo.webm -vf scale=1280:720 \
+  -c:v libx264 -preset slow -crf 37 -pix_fmt yuv420p -movflags +faststart -an \
+  docs/video/streetlight-demo-720p.mp4
+
+ffmpeg -ss 67 -t 8 -i docs/video/streetlight-demo.webm \
+  -vf "fps=10,crop=820:560:400:150,scale=640:437:flags=lanczos,split[a][b];[a]palettegen=max_colors=64[p];[b][p]paletteuse=dither=bayer:bayer_scale=4" \
+  docs/shots/street-loop.gif
+```
+
+The 720p cut is about 14 MB and is committed, because a reader should not have
+to run anything to see what this is. The full-resolution recording is 90 MB and
+is not: `.gitignore` keeps everything in `docs/video/` except the 720p file.
+Recording again clears stale WebM takes and leaves that file alone.
+
+CRF 37 is the point where the assistant's text is still readable at 720p. Lower
+numbers look better and cost megabytes that every clone pays for.
+
+The loop is a GIF because GitHub documents GIF as rendering everywhere, and a
+README that animates for some readers and not others is worse than one that
+does not animate at all. Animated WebP is several times smaller and does render
+in practice, but it is not on GitHub's supported list.
 
 ## What the take covers
 
-1. The whole city at commute hour, 45,000 agents on the real street network.
-2. Pushing in on downtown, where the dots resolve into people.
-3. Street level: pixel characters walking, vehicles, and place signs by category.
-4. City data layers switched on one at a time, close enough to read.
-5. Clicking a block for its report: footfall by hour, complaints, incidents,
-   permits, land use, and the places already there.
-6. **Business** — a chai house with a stated budget and customer, answered with
-   real vacant addresses and quoted reviews.
-7. **Planner** — the Tenderloin: complaints, walkability and what is being
-   built, with the assistant switching the matching layers on itself.
-8. **City operations** — a sold-out Warriors game: transit surge, departure
-   crush and block-level crowding.
-9. Time travel back and forward, then back to now.
+Timestamps are from the recording committed as `streetlight-demo-720p.mp4`, read
+off the video rather than computed from the script. A fresh take will drift:
+chapters 6 to 8 each wait on a live model answer, and those ran between one and
+three minutes apiece.
+
+1. **00:13** The whole city at commute hour, 45,000 agents on the real street
+   network.
+2. **00:31** Pushing in on downtown, where the dots resolve into people.
+3. **00:43** Street level: pixel characters walking, vehicles, and place signs
+   by category.
+4. **01:33** City data layers switched on one at a time, close enough to read.
+5. **02:48** Clicking a block for its report: footfall by hour, complaints,
+   incidents, permits, land use, and the places already there.
+6. **03:08** **Business** — a chai house with a stated budget and customer,
+   answered with real vacant addresses and quoted reviews.
+7. **06:12** **Planner** — the Tenderloin: complaints, walkability and what is
+   being built, with the assistant switching the matching layers on itself.
+8. **07:12** **City operations** — a sold-out Warriors game: transit surge,
+   departure crush and block-level crowding.
+9. **08:12** Time travel back and forward, then back to now.
 
 The clock is re-anchored between chapters. Without that the take drifts five
 simulated days ahead of real time, and later chapters carry a date nobody asked

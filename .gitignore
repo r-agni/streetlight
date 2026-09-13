@@ -14,4 +14,6 @@ apps/web/public/sprites/*.png
 .vite/
 .DS_Store
 data/*.log
-docs/video/
+# the full-resolution recording is 90 MB; the 720p cut beside it is committed
+docs/video/*
+!docs/video/streetlight-demo-720p.mp4
