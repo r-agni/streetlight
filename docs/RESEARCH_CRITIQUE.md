@@ -1,6 +1,6 @@
 ## 0. Scope warning — I was handed a truncated spec
 
-What arrived starts **mid-table inside §9** ("…`erasableSyntaxOnly`…"). Sections 1–8 are absent. Every acceptance criterion in §10 dereferences a section I cannot see: §1.5, §3.1, §3.5, §3.6, §4.3, §4.5, §4.8, §5.1, §5.4, §6.2. So this review covers §9 (reuse inventory), §10 (build order), and — more usefully — the **code already committed at `C:\Users\agni_\Documents\sfModeling`**, which I read and which contradicts the build order in several load-bearing places. Treat the design-system and halftone findings below as inferred from the reference aesthetic, not from spec text I was shown.
+What arrived starts **mid-table inside §9** ("…`erasableSyntaxOnly`…"). Sections 1–8 are absent. Every acceptance criterion in §10 dereferences a section I cannot see: §1.5, §3.1, §3.5, §3.6, §4.3, §4.5, §4.8, §5.1, §5.4, §6.2. So this review covers §9 (reuse inventory), §10 (build order), and — more usefully — the **code already committed at `<repo root>`**, which I read and which contradicts the build order in several load-bearing places. Treat the design-system and halftone findings below as inferred from the reference aesthetic, not from spec text I was shown.
 
 ---
 
@@ -185,7 +185,7 @@ OSM (ODbL) and Protomaps both require visible attribution, and step 4's acceptan
 
 ### 20. §10 describes a repo that isn't the repo
 
-Checked against `C:\Users\agni_\Documents\sfModeling`:
+Checked against `<repo root>`:
 
 | §10 says | Repo has |
 |---|---|
@@ -220,4 +220,4 @@ Steps 1 and 2 will fail as written on the first try. Reconcile the names before 
 
 ---
 
-**Sources:** [MapLibre GL JS v6 migration guide](https://maplibre.org/maplibre-gl-js/docs/guides/v5-to-v6-migration-guide/), [maplibre-gl on npm](https://www.npmjs.com/package/maplibre-gl), [MapLibre news](https://maplibre.org/news/). Version and API facts above came from the npm registry API, the GitHub issues API, and direct reads of `C:\Users\agni_\Documents\sfModeling\node_modules\{@deck.gl,@luma.gl,@protomaps}` and `C:\Users\agni_\Documents\sfModeling\{packages\protocol\src\index.ts, apps\sim\sim\protocol.py, apps\web\src\ws\interpolator.ts}`.
+**Sources:** [MapLibre GL JS v6 migration guide](https://maplibre.org/maplibre-gl-js/docs/guides/v5-to-v6-migration-guide/), [maplibre-gl on npm](https://www.npmjs.com/package/maplibre-gl), [MapLibre news](https://maplibre.org/news/). Version and API facts above came from the npm registry API, the GitHub issues API, and direct reads of `<repo root>\node_modules\{@deck.gl,@luma.gl,@protomaps}` and `<repo root>\{packages\protocol\src\index.ts, apps\sim\sim\protocol.py, apps\web\src\ws\interpolator.ts}`.
