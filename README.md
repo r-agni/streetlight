@@ -25,6 +25,8 @@ Eight seconds at street level: residents walking real sidewalks, each following 
 
 **[Full walkthrough](docs/video/streetlight-demo-720p.mp4)** — 8:40, recorded by driving a real browser against the running services, so every figure on screen was computed during the take. GitHub serves committed video as a download rather than playing it inline (~14 MB).
 
+Or watch it on YouTube: **[streetlight demo](https://www.youtube.com/watch?v=Wiyq0EnrddQ)**.
+
 | The city | The data | The three audiences |
 |---|---|---|
 | **00:04** Whole city at commute hour | **01:54** City data layers | **03:08** Business: where to sign a lease |
